@@ -28,7 +28,7 @@ interface Member {
 }
 
 function AdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  // Authentication removed - direct admin access
   // Password authentication removed - admin access is now open
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'year' | 'custom'>('week');
   const [startDate, setStartDate] = useState(getTorontoTime());

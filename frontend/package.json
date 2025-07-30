@@ -17,6 +17,7 @@
     "react-error-boundary": "^4.1.2",
     "recharts": "^2.15.0",
     "date-fns": "^4.1.0",
+    "jsbarcode": "^3.11.6",
     "qrcode": "^1.5.4",
     "react-qr-code": "^2.0.18"
   },
