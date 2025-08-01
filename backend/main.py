@@ -124,12 +124,16 @@ async def log_requests(request: Request, call_next):
     
     return response
 
-# Drop and recreate tables only in development
-# if os.getenv("ENVIRONMENT") == "development":
-#     models.Base.metadata.drop_all(bind=engine)
-#     models.Base.metadata.create_all(bind=engine)
-# else:
-    models.Base.metadata.create_all(bind=engine)
+# Create tables on startup
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # Create all tables
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error("Failed to create database tables", error=str(e))
+        raise e
 
 # Dependency to get DB session
 def get_db():
