@@ -349,7 +349,64 @@ function MemberCheckin() {
                 transition={{ duration: 0.3 }}
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  // Validate all names
+                  
+                  // SIMPLE REGISTRATION OVERRIDE: If email is provided, register user
+                  if (formEmail && formEmail.trim()) {
+                    console.log("🔍 Starting REGISTRATION flow");
+                    
+                    // Validate inputs
+                    if (!formName.trim()) {
+                      setStatus("error");
+                      setMessage("Please enter your name.");
+                      return;
+                    }
+
+                    if (!/^\s*\S+\s+\S+/.test(formName.trim())) {
+                      setStatus("error");
+                      setMessage("Please enter your full name (first and last).");
+                      return;
+                    }
+
+                    setStatus("loading");
+                    setMessage("");
+                    const API_URL = getApiUrl();
+
+                    try {
+                      const response = await fetch(`${API_URL}/member/register-only`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: formName.trim(),
+                          email: formEmail.trim(),
+                        }),
+                      });
+
+                      if (response.ok) {
+                        const result = await response.json();
+                        console.log("✅ Registration successful:", result);
+                        
+                        // Store member data and redirect to profile
+                        localStorage.setItem("member_email", formEmail.trim());
+                        localStorage.setItem("member_id", result.member.id);
+                        localStorage.removeItem("family_members");
+                        
+                        window.location.href = `/profile?id=${result.member.id}`;
+                        return;
+                      } else {
+                        const error = await response.json();
+                        setStatus("error");
+                        setMessage(error.detail || "Registration failed. Please try again.");
+                        return;
+                      }
+                    } catch (error) {
+                      console.error("❌ Registration error:", error);
+                      setStatus("error");
+                      setMessage("Network error. Please try again.");
+                      return;
+                    }
+                  }
+                  
+                  // FALLBACK: Original complex logic for existing users
                   const allNames = [formName, ...familyNames];
                   console.log("🔍 Starting returning user flow with names:", allNames);
                   

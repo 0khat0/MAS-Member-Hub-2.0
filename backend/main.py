@@ -487,6 +487,54 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     
     return models.MemberOut.model_validate(member)
 
+@app.post("/member/register-only")
+@limiter.limit("10/minute")
+async def register_member_only(request: Request, member_data: dict, db: Session = Depends(get_db)):
+    """Register a new member without checking them in"""
+    email = member_data.get("email")
+    name = member_data.get("name")
+    
+    if not email or not name:
+        raise HTTPException(status_code=400, detail="Email and name are required")
+    
+    # Check if member already exists (not soft-deleted)
+    existing = db.query(models.Member).filter(
+        models.Member.email == email,
+        models.Member.name == name,
+        models.Member.deleted_at.is_(None)
+    ).first()
+    
+    if existing:
+        # Return existing member instead of error for better UX
+        return {
+            "message": "Welcome back! Redirecting to your profile.",
+            "member": models.MemberOut.model_validate(existing),
+            "is_existing": True
+        }
+    
+    # Generate unique barcode
+    while True:
+        barcode = generate_barcode()
+        existing_barcode = db.query(models.Member).filter(models.Member.barcode == barcode).first()
+        if not existing_barcode:
+            break
+    
+    member = models.Member(email=email, name=name, barcode=barcode)
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    
+    # Update metrics
+    MEMBER_COUNT.inc()
+    
+    logger.info("Member registered (no check-in)", member_id=str(member.id), email=email, name=name)
+    
+    return {
+        "message": "Registration successful! Welcome to MAS Academy.",
+        "member": models.MemberOut.model_validate(member),
+        "is_existing": False
+    }
+
 @app.post("/family/register")
 @limiter.limit("10/minute")
 async def register_family(request: Request, family_data: models.FamilyRegistration, db: Session = Depends(get_db)):
@@ -737,7 +785,7 @@ async def get_member_stats(request: Request, member_id: str, db: Session = Depen
         raise HTTPException(status_code=400, detail="Invalid member ID format")
     
     # Get member
-    member = db.query(models.Member).filter(models.Member.id == member_id).first()
+    member = db.query(models.Member).filter(models.Member.id == uuid.UUID(member_id)).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
@@ -750,7 +798,7 @@ async def get_member_stats(request: Request, member_id: str, db: Session = Depen
     
     # Get all check-ins for streak calculation
     all_check_ins = db.query(models.Checkin.timestamp)\
-        .filter(models.Checkin.member_id == member_id)\
+        .filter(models.Checkin.member_id == uuid.UUID(member_id))\
         .all()
     
     # Convert to list of datetime objects
@@ -760,7 +808,7 @@ async def get_member_stats(request: Request, member_id: str, db: Session = Depen
     monthly_check_ins = db.query(func.count(models.Checkin.id))\
         .filter(
             and_(
-                models.Checkin.member_id == member_id,
+                models.Checkin.member_id == uuid.UUID(member_id),
                 models.Checkin.timestamp >= start_of_month
             )
         ).scalar()

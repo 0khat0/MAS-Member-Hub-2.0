@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
+import ProfilePage from "./ProfilePage";
 import { getMemberId } from "./utils";
 
 // Lazy load components for better performance
@@ -101,10 +102,10 @@ function AppContent() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    {/* Only show MemberStats if memberId exists */}
-                    {memberId ? <MemberStats memberId={memberId} /> : <div className="text-center text-lg mt-8">No profile found. Please check in first.</div>}
+                    <ProfilePage />
                   </motion.div>
                 } />
+
                 <Route path="/admin" element={
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
