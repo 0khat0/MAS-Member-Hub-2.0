@@ -321,23 +321,43 @@ function MemberCheckin() {
           </motion.div>
         )}
 
-        {/* NEW USER STATE: No recognition - show registration form + returning user button */}
-        {status === "register" && familyMembers.length === 0 && (
-          <>
-            <motion.div
-              className="w-full max-w-md mb-2"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <button
-                type="button"
-                className="w-full bg-gradient-to-r from-black via-gray-800 to-gray-900 border border-gray-800 rounded-lg p-3 text-white text-center text-base font-semibold focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
-                onClick={() => setCheckinByName((v) => !v)}
-              >
-                {checkinByName ? "Back to Register" : "Already Registered? Tap Here To Check In!"}
-              </button>
-            </motion.div>
+                 {/* NEW USER STATE: No recognition - show registration form + modern toggle */}
+         {status === "register" && familyMembers.length === 0 && (
+           <>
+             {/* Modern toggle at bottom */}
+             <motion.div
+               className="w-full max-w-md mt-4"
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.3 }}
+             >
+               <div className="flex items-center justify-center space-x-4 text-sm">
+                 <span className="text-white/60">New to MAS Academy?</span>
+                 <button
+                   type="button"
+                   className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
+                     !checkinByName 
+                       ? 'bg-white/10 text-white border border-white/20' 
+                       : 'text-white/60 hover:text-white'
+                   }`}
+                   onClick={() => setCheckinByName(false)}
+                 >
+                   Register
+                 </button>
+                 <span className="text-white/60">or</span>
+                 <button
+                   type="button"
+                   className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
+                     checkinByName 
+                       ? 'bg-white/10 text-white border border-white/20' 
+                       : 'text-white/60 hover:text-white'
+                   }`}
+                   onClick={() => setCheckinByName(true)}
+                 >
+                   Sign In
+                 </button>
+               </div>
+             </motion.div>
 
             {/* Show registration form or check-in by name form */}
             {!checkinByName ? (
@@ -571,31 +591,58 @@ function MemberCheckin() {
                   }
                 }}
               >
-                <div className="glass-card space-y-6 p-6">
-                  {/* Family Toggle */}
-                  <motion.div className="flex justify-center mb-4">
-                    <button
-                      type="button"
-                      onClick={() => setIsFamily(!isFamily)}
-                      className={`px-6 py-2 rounded-full font-semibold transition-all duration-200 border-2 ${
-                        isFamily 
-                          ? 'bg-gray-800 text-white/70 border-gray-700 hover:bg-gray-700' 
-                          : 'bg-gradient-to-r from-red-600 to-red-700 text-white border-red-600'
-                      }`}
-                    >
-                      {isFamily ? 'Go Back' : '👨‍👩‍👧‍👦 Family?'}
-                    </button>
-                  </motion.div>
+                                 <div className="glass-card space-y-6 p-6">
+                   {/* Modern Family Toggle */}
+                   <motion.div className="flex justify-center mb-6">
+                     <div className="bg-white/5 rounded-full p-1 flex">
+                       <button
+                         type="button"
+                         onClick={() => setIsFamily(false)}
+                         className={`px-6 py-2 rounded-full font-medium transition-all duration-200 ${
+                           !isFamily 
+                             ? 'bg-white/20 text-white shadow-sm' 
+                             : 'text-white/60 hover:text-white'
+                         }`}
+                       >
+                         Individual
+                       </button>
+                       <button
+                         type="button"
+                         onClick={() => setIsFamily(true)}
+                         className={`px-6 py-2 rounded-full font-medium transition-all duration-200 ${
+                           isFamily 
+                             ? 'bg-white/20 text-white shadow-sm' 
+                             : 'text-white/60 hover:text-white'
+                         }`}
+                       >
+                         👨‍👩‍👧‍👦 Family
+                       </button>
+                     </div>
+                   </motion.div>
                   
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                    <label className="block text-lg font-medium text-white/90">Full Name</label>
-                    <input className="input-field" placeholder="Enter your full name" type="text" value={formName} onChange={e => setFormName(e.target.value)} required />
+                    <label className="block text-sm font-medium text-white/80 mb-2">Full Name</label>
+                    <input 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                      placeholder="Enter your full name" 
+                      type="text" 
+                      value={formName} 
+                      onChange={e => setFormName(e.target.value)} 
+                      required 
+                    />
                   </motion.div>
                   
                   {/* Family member fields - only show if family mode is active */}
                   {isFamily && familyNames.map((name, idx) => (
                     <motion.div key={idx} className="flex items-center gap-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
-                      <input className="input-field flex-1" placeholder="Enter family member's full name" type="text" value={name} onChange={e => handleFamilyNameChange(idx, e.target.value)} required />
+                      <input 
+                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                        placeholder="Enter family member's full name" 
+                        type="text" 
+                        value={name} 
+                        onChange={e => handleFamilyNameChange(idx, e.target.value)} 
+                        required 
+                      />
                       <button type="button" className="text-red-400 font-bold px-2" onClick={() => removeFamilyMember(idx)} aria-label="Remove family member">&times;</button>
                     </motion.div>
                   ))}
@@ -612,9 +659,9 @@ function MemberCheckin() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <label className="block text-lg font-medium text-white/90">Email Address</label>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Email Address</label>
                     <input
-                      className="input-field"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200"
                       placeholder="Enter your email"
                       type="email"
                       value={formEmail}
@@ -622,14 +669,14 @@ function MemberCheckin() {
                       required
                     />
                   </motion.div>
-                  <motion.button
-                    className="w-full bg-gradient-to-r from-red-700 via-red-500 to-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:from-pink-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-black/30"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="submit"
-                  >
-                    {isFamily ? 'Register Family & Check In' : 'Register & Check In'}
-                  </motion.button>
+                                     <motion.button
+                     className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
+                     whileHover={{ scale: 1.02 }}
+                     whileTap={{ scale: 0.98 }}
+                     type="submit"
+                   >
+                     {isFamily ? 'Register Family' : 'Create Account'}
+                   </motion.button>
                 </div>
               </motion.form>
             ) : (
@@ -809,27 +856,41 @@ function MemberCheckin() {
                 <div className="glass-card space-y-6 p-6">
                   {message && (<div className="text-red-400 text-center font-semibold mb-2">{message}</div>)}
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                    <label className="block text-lg font-medium text-white/90">Full Name</label>
-                    <input className="input-field" placeholder="Enter your full name" type="text" value={formName} onChange={e => setFormName(e.target.value)} required />
+                    <label className="block text-sm font-medium text-white/80 mb-2">Full Name</label>
+                    <input 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                      placeholder="Enter your full name" 
+                      type="text" 
+                      value={formName} 
+                      onChange={e => setFormName(e.target.value)} 
+                      required 
+                    />
                   </motion.div>
                   {/* Family member fields */}
                   {familyNames.map((name, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <input className="input-field flex-1" placeholder="Enter family member's full name" type="text" value={name} onChange={e => handleFamilyNameChange(idx, e.target.value)} required />
+                      <input 
+                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                        placeholder="Enter family member's full name" 
+                        type="text" 
+                        value={name} 
+                        onChange={e => handleFamilyNameChange(idx, e.target.value)} 
+                        required 
+                      />
                       <button type="button" className="text-red-400 font-bold px-2" onClick={() => removeFamilyMember(idx)} aria-label="Remove family member">&times;</button>
                     </div>
                   ))}
                   <button type="button" className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors duration-200" onClick={addFamilyMember}>
                     + Add Family Member
                   </button>
-                  <motion.button
-                    className="w-full bg-gradient-to-r from-red-700 via-red-500 to-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:from-pink-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-black/30"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="submit"
-                  >
-                    Check In
-                  </motion.button>
+                                     <motion.button
+                     className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
+                     whileHover={{ scale: 1.02 }}
+                     whileTap={{ scale: 0.98 }}
+                     type="submit"
+                   >
+                     Sign In
+                   </motion.button>
                 </div>
               </motion.form>
             )}
