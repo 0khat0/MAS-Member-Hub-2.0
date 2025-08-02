@@ -3,17 +3,27 @@ import { useEffect, useState } from "react";
 import QRCodeLib from "qrcode";
 
 interface QRCodeGeneratorProps {
-  data: object;
+  data: string | object;
   size?: number;
 }
 
 const QRCodeGenerator: FC<QRCodeGeneratorProps> = ({ data, size = 160 }) => {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   if (!data) return <div className="text-gray-400">No QR code available</div>;
-  const value = JSON.stringify(data);
+  const value = typeof data === 'string' ? data : JSON.stringify(data);
 
   useEffect(() => {
-    QRCodeLib.toDataURL(value, { width: size, margin: 2, color: { dark: "#fff", light: "#18181b" } }, (error: Error | null | undefined, url: string) => {
+    // Improved QR code settings for better scanner compatibility
+    QRCodeLib.toDataURL(value, { 
+      width: size, 
+      margin: 4, // Increased margin for better scanning
+      color: { 
+        dark: "#000000", // Pure black for better contrast
+        light: "#FFFFFF"  // Pure white background
+      },
+      errorCorrectionLevel: 'H', // Highest error correction for better scanning
+      scale: 8 // Higher scale for better quality
+    }, (error: Error | null | undefined, url: string) => {
       if (!error && url) setImgUrl(url);
     });
   }, [value, size]);
@@ -42,6 +52,19 @@ const QRCodeGenerator: FC<QRCodeGeneratorProps> = ({ data, size = 160 }) => {
         <div className="mt-3 text-xs text-purple-200 text-center">
           Long-press the QR code to save it to your Photos.
         </div>
+        <button
+          onClick={() => {
+            if (imgUrl) {
+              const link = document.createElement('a');
+              link.href = imgUrl;
+              link.download = 'mas-qr-code.png';
+              link.click();
+            }
+          }}
+          className="mt-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-lg transition-colors duration-200"
+        >
+          Download QR Code
+        </button>
       </div>
     </div>
   );

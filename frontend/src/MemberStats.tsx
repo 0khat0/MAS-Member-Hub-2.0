@@ -307,18 +307,13 @@ function MemberStats({ memberId }: Props) {
           {(() => {
             let qrData = null;
             if (isFamily && familyMembers.length > 1) {
-              qrData = {
-                type: "family",
-                email: stats.email,
-                members: familyMembers.map(m => ({ name: m.name, barcode: (m as any).barcode })),
-              };
+              // For family, create a simple text format that's easier to scan
+              const familyText = `FAMILY:${stats.email}|${familyMembers.map(m => `${m.name}:${(m as any).barcode}`).join(',')}`;
+              qrData = familyText;
             } else if (stats.barcode && stats.email) {
-              qrData = {
-                type: "member",
-                barcode: stats.barcode,
-                email: stats.email,
-                name: stats.name,
-              };
+              // For individual member, create a simple text format that's easier to scan
+              const memberText = `MEMBER:${stats.name}|${stats.email}|${stats.barcode}`;
+              qrData = memberText;
             }
             return qrData ? (
               <QRCodeGenerator data={qrData} />
