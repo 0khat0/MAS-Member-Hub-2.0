@@ -331,32 +331,31 @@ function MemberCheckin() {
                animate={{ opacity: 1, y: 0 }}
                transition={{ duration: 0.3 }}
              >
-               <div className="flex items-center justify-center space-x-4 text-sm">
-                 <span className="text-white/60">New to MAS Academy?</span>
-                 <button
-                   type="button"
-                   className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
-                     !checkinByName 
-                       ? 'bg-white/10 text-white border border-white/20' 
-                       : 'text-white/60 hover:text-white'
-                   }`}
-                   onClick={() => setCheckinByName(false)}
-                 >
-                   Register
-                 </button>
-                 <span className="text-white/60">or</span>
-                 <button
-                   type="button"
-                   className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
-                     checkinByName 
-                       ? 'bg-white/10 text-white border border-white/20' 
-                       : 'text-white/60 hover:text-white'
-                   }`}
-                   onClick={() => setCheckinByName(true)}
-                 >
-                   Sign In
-                 </button>
-               </div>
+                               <div className="flex items-center justify-center space-x-4 text-sm">
+                  <button
+                    type="button"
+                    className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
+                      !checkinByName 
+                        ? 'bg-white/10 text-white border border-white/20' 
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                    onClick={() => setCheckinByName(false)}
+                  >
+                    Register
+                  </button>
+                  <span className="text-white/60">or</span>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 rounded-full font-medium transition-all duration-200 ${
+                      checkinByName 
+                        ? 'bg-white/10 text-white border border-white/20' 
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                    onClick={() => setCheckinByName(true)}
+                  >
+                    Sign In
+                  </button>
+                </div>
              </motion.div>
 
             {/* Show registration form or check-in by name form */}
@@ -632,20 +631,28 @@ function MemberCheckin() {
                     />
                   </motion.div>
                   
-                  {/* Family member fields - only show if family mode is active */}
-                  {isFamily && familyNames.map((name, idx) => (
-                    <motion.div key={idx} className="flex items-center gap-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
-                      <input 
-                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                        placeholder="Enter family member's full name" 
-                        type="text" 
-                        value={name} 
-                        onChange={e => handleFamilyNameChange(idx, e.target.value)} 
-                        required 
-                      />
-                      <button type="button" className="text-red-400 font-bold px-2" onClick={() => removeFamilyMember(idx)} aria-label="Remove family member">&times;</button>
-                    </motion.div>
-                  ))}
+                                     {/* Family member fields - only show if family mode is active */}
+                   {isFamily && familyNames.map((name, idx) => (
+                     <motion.div key={idx} className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
+                       <input 
+                         className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                         placeholder="Enter family member's full name" 
+                         type="text" 
+                         value={name} 
+                         onChange={e => handleFamilyNameChange(idx, e.target.value)} 
+                         required 
+                       />
+                       <button 
+                         type="button" 
+                         className="bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg transition-all duration-200 hover:scale-110 shadow-lg" 
+                         onClick={() => removeFamilyMember(idx)} 
+                         aria-label="Remove family member"
+                         title="Remove family member"
+                       >
+                         ×
+                       </button>
+                     </motion.div>
+                   ))}
                   
                   {isFamily && (
                     <motion.button type="button" className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors duration-200" onClick={addFamilyMember} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
@@ -866,20 +873,28 @@ function MemberCheckin() {
                       required 
                     />
                   </motion.div>
-                  {/* Family member fields */}
-                  {familyNames.map((name, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input 
-                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                        placeholder="Enter family member's full name" 
-                        type="text" 
-                        value={name} 
-                        onChange={e => handleFamilyNameChange(idx, e.target.value)} 
-                        required 
-                      />
-                      <button type="button" className="text-red-400 font-bold px-2" onClick={() => removeFamilyMember(idx)} aria-label="Remove family member">&times;</button>
-                    </div>
-                  ))}
+                                     {/* Family member fields */}
+                   {familyNames.map((name, idx) => (
+                     <div key={idx} className="flex items-center gap-3">
+                       <input 
+                         className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                         placeholder="Enter family member's full name" 
+                         type="text" 
+                         value={name} 
+                         onChange={e => handleFamilyNameChange(idx, e.target.value)} 
+                         required 
+                       />
+                       <button 
+                         type="button" 
+                         className="bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg transition-all duration-200 hover:scale-110 shadow-lg" 
+                         onClick={() => removeFamilyMember(idx)} 
+                         aria-label="Remove family member"
+                         title="Remove family member"
+                       >
+                         ×
+                       </button>
+                     </div>
+                   ))}
                   <button type="button" className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors duration-200" onClick={addFamilyMember}>
                     + Add Family Member
                   </button>
