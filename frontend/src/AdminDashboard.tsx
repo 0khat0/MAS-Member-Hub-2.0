@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format } from 'date-fns';
 import { getTorontoTime } from './utils';
 
 interface DailyCheckin {
@@ -30,11 +20,6 @@ interface Member {
 function AdminDashboard() {
   // Authentication removed - direct admin access
   // Password authentication removed - admin access is now open
-  const [dateRange, setDateRange] = useState<'week' | 'month' | 'year' | 'custom'>('week');
-  const [startDate, setStartDate] = useState(getTorontoTime());
-  const [endDate, setEndDate] = useState(getTorontoTime());
-  const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month' | 'year'>('day');
-  const [checkinData, setCheckinData] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [todayCheckins, setTodayCheckins] = useState<DailyCheckin[]>([]);
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -45,22 +30,10 @@ function AdminDashboard() {
   // Authentication check removed - admin access is now open
 
   useEffect(() => {
-    // Set initial date range
-    updateDateRange(dateRange);
     // Fetch today's check-ins
     fetchTodayCheckins();
-  }, []);
-
-  useEffect(() => {
-    if (dateRange !== 'custom') {
-      updateDateRange(dateRange);
-    }
-  }, [dateRange]);
-
-  useEffect(() => {
-    fetchCheckinData();
     fetchStats();
-  }, [startDate, endDate, groupBy]);
+  }, []);
 
   useEffect(() => {
     fetchTodayCheckins(); // initial fetch
@@ -91,39 +64,7 @@ function AdminDashboard() {
     });
   };
 
-  const updateDateRange = (range: 'week' | 'month' | 'year' | 'custom') => {
-    const now = getTorontoTime();
-    switch (range) {
-      case 'week':
-        setStartDate(startOfWeek(now));
-        setEndDate(endOfWeek(now));
-        setGroupBy('day');
-        break;
-      case 'month':
-        setStartDate(startOfMonth(now));
-        setEndDate(endOfMonth(now));
-        setGroupBy('day');
-        break;
-      case 'year':
-        setStartDate(startOfYear(now));
-        setEndDate(endOfYear(now));
-        setGroupBy('month');
-        break;
-    }
-  };
 
-  const fetchCheckinData = async () => {
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-      const response = await fetch(
-        `${API_URL}/admin/checkins/range?start_date=${format(startDate, 'yyyy-MM-dd')}&end_date=${format(endDate, 'yyyy-MM-dd')}&group_by=${groupBy}`
-      );
-      const data = await response.json();
-      setCheckinData(data);
-    } catch (error) {
-      console.error('Error fetching check-in data:', error);
-    }
-  };
 
   const fetchStats = async () => {
     try {
@@ -156,62 +97,7 @@ function AdminDashboard() {
 
   // Login handler removed - admin access is now open
 
-  // Helper to generate a range of dates (days or months) for zero-filling
-  function generateDateRange(start: Date, end: Date, group: 'day' | 'month') {
-    const range = [];
-    let current = new Date(start);
-    if (group === 'month') {
-      // Set both current and end to the first of their months at midnight
-      current = new Date(current.getFullYear(), current.getMonth(), 1, 0, 0, 0, 0);
-      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1, 0, 0, 0, 0);
-      while (current <= endMonth) {
-        range.push(format(current, 'yyyy-MM'));
-        current.setMonth(current.getMonth() + 1);
-      }
-    } else {
-      // Set both current and end to midnight
-      current.setHours(0, 0, 0, 0);
-      const endDay = new Date(end);
-      endDay.setHours(0, 0, 0, 0);
-      while (current <= endDay) {
-        range.push(format(current, 'yyyy-MM-dd'));
-        current.setDate(current.getDate() + 1);
-      }
-    }
-    return range;
-  }
 
-  // --- Build processed data with zero-fill using date part only ---
-  let processedCheckinData: { date: string, count: number }[] = [];
-  if (groupBy === 'month') {
-    // Year view: group by month
-    const countMap = new Map<string, number>();
-    checkinData.forEach(d => {
-      // Always use Toronto month for key
-      const dDate = new Date(d.date);
-      const torontoMonth = dDate.toLocaleString('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit' }).slice(0, 7); // YYYY-MM
-      countMap.set(torontoMonth, (countMap.get(torontoMonth) || 0) + (d.count || 0));
-    });
-    const allMonths = generateDateRange(startDate, endDate, 'month');
-    processedCheckinData = allMonths.map(monthKey => ({
-      date: `${monthKey}-01`, // Use first day of month for chart X axis
-      count: countMap.get(monthKey) || 0
-    }));
-  } else {
-    // Week/month view: group by day
-    const countMap = new Map<string, number>();
-    checkinData.forEach(d => {
-      // Always use Toronto date for key
-      const dDate = new Date(d.date);
-      const torontoDay = dDate.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }); // YYYY-MM-DD
-      countMap.set(torontoDay, (countMap.get(torontoDay) || 0) + (d.count || 0));
-    });
-    const allDays = generateDateRange(startDate, endDate, 'day');
-    processedCheckinData = allDays.map(dayKey => ({
-      date: dayKey,
-      count: countMap.get(dayKey) || 0
-    }));
-  }
 
   // Login form removed - admin access is now open
 
@@ -406,95 +292,7 @@ function AdminDashboard() {
           </div>
         </motion.div>
 
-        {/* Date Range Controls - Redesigned */}
-        <motion.div 
-          className="glass-card p-6 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <div className="flex flex-wrap gap-2 mb-4 justify-center">
-            {['week', 'month', 'year', 'custom'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setDateRange(range as any)}
-                className={`px-5 py-2 rounded-full font-semibold transition-all duration-200 shadow-sm border-2 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm
-                  ${dateRange === range ? 'bg-gradient-to-r from-red-600 to-red-700 text-white border-red-600 scale-105' : 'bg-gray-800 text-white/70 border-gray-700 hover:bg-gray-700'}`}
-              >
-                {range === 'week' && 'This Week'}
-                {range === 'month' && 'This Month'}
-                {range === 'year' && 'This Year'}
-                {range === 'custom' && 'Custom'}
-              </button>
-            ))}
-          </div>
-          {dateRange === 'custom' && (
-            <div className="flex flex-wrap gap-4 mb-4 justify-center">
-              <input
-                type="date"
-                value={format(startDate, 'yyyy-MM-dd')}
-                onChange={(e) => setStartDate(new Date(e.target.value))}
-                className="input-field"
-              />
-              <input
-                type="date"
-                value={format(endDate, 'yyyy-MM-dd')}
-                onChange={(e) => setEndDate(new Date(e.target.value))}
-                className="input-field"
-              />
-            </div>
-          )}
-        </motion.div>
 
-        {/* Check-in Chart */}
-        <motion.div 
-          className="glass-card p-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <h2 className="text-xl font-semibold text-white mb-6">Check-in Trends</h2>
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processedCheckinData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="rgba(255,255,255,0.5)"
-                  tickFormatter={(date) => {
-                    const d = new Date(date);
-                    return groupBy === 'month' ? format(d, 'MMM yyyy') : format(d, 'MMM d');
-                  }}
-                  minTickGap={10}
-                />
-                <YAxis stroke="rgba(255,255,255,0.5)" allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(0,0,0,0.85)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                  }}
-                  labelFormatter={(date) => {
-                    const d = new Date(date);
-                    return groupBy === 'month' ? format(d, 'MMMM yyyy') : format(d, 'PPP');
-                  }}
-                  formatter={(value: any) => [`${value} check-in${value === 1 ? '' : 's'}`, '']}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Check-ins"
-                  stroke="#ef4444"
-                  strokeWidth={3}
-                  dot={{ r: 4, stroke: '#fff', strokeWidth: 2 }}
-                  activeDot={{ r: 8 }}
-                  isAnimationActive={true}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
