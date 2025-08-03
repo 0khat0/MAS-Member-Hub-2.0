@@ -83,8 +83,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Custom middleware for logging and metrics
@@ -865,7 +866,7 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
     
     # Get member
     member = db.query(models.Member).filter(
-        models.Member.id == member_id,
+        models.Member.id == uuid.UUID(member_id),
         models.Member.deleted_at.is_(None)
     ).first()
     
@@ -873,14 +874,13 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
         raise HTTPException(status_code=404, detail="Member not found")
     
     # Update fields
-    if update.name is not None:
-        setattr(member, 'name', update.name)
+    setattr(member, 'name', update.name)
     
-    if update.email is not None:
-        # If email is being changed, update all family members
-        old_email = member.email
-        new_email = update.email
-        
+    # If email is being changed, update all family members
+    old_email = member.email
+    new_email = update.email
+    
+    if old_email != new_email:
         # Update all family members with the same email
         family_members = db.query(models.Member).filter(
             models.Member.email == old_email,
@@ -891,6 +891,9 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
             setattr(family_member, 'email', new_email)
         
         logger.info("Family email updated", old_email=old_email, new_email=new_email, member_count=len(family_members))
+    else:
+        # Just update the name
+        logger.info("Member name updated", member_id=str(member.id), old_name=member.name, new_name=update.name)
     
     db.commit()
     db.refresh(member)

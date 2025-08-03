@@ -41,6 +41,7 @@ function MemberStats({ memberId }: Props) {
   const [editEmail, setEditEmail] = useState('');
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   
   // Family member states
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -146,6 +147,7 @@ function MemberStats({ memberId }: Props) {
           const response = await fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
           if (response.ok) {
             const data = await response.json();
+            console.log('🔍 Debug: Family members from API:', data);
             setFamilyMembers(data || []);
             // Update localStorage with current family members
             const memberNames = data.map((m: any) => m.name);
@@ -155,6 +157,7 @@ function MemberStats({ memberId }: Props) {
             
             // For family mode, also set the first member as selected if no member is selected
             if (memberId === 'family' && data && data.length > 0) {
+              console.log('🔍 Debug: Setting selected member ID to:', data[0].id);
               setSelectedMemberId(data[0].id);
               setEditName(data[0].name);
               setEditEmail(data[0].email);
@@ -235,38 +238,94 @@ function MemberStats({ memberId }: Props) {
   const handleMemberUpdate = async (memberIdToUpdate: string, name: string, email: string) => {
     setEditError('');
     setEditSuccess('');
+    setIsUpdating(true);
     try {
       const API_URL = getApiUrl();
+      console.log('🔍 Debug: Updating member', {
+        memberIdToUpdate,
+        name,
+        email,
+        API_URL: `${API_URL}/member/${memberIdToUpdate}`,
+        isValidUUID: isValidUUID(memberIdToUpdate),
+        selectedMemberId,
+        familyMembers: familyMembers.map(m => ({ id: m.id, name: m.name, email: m.email }))
+      });
+      
+      // Validate memberIdToUpdate is a valid UUID
+      if (!isValidUUID(memberIdToUpdate)) {
+        console.error('❌ Invalid member ID:', memberIdToUpdate);
+        setEditError('Invalid member ID. Please refresh the page and try again.');
+        return;
+      }
+      
       const res = await fetch(`${API_URL}/member/${memberIdToUpdate}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email }),
       });
       
+      console.log('🔍 Debug: Response status', res.status);
+      console.log('🔍 Debug: Response ok', res.ok);
+      
       if (res.ok) {
         setEditSuccess('Profile updated successfully!');
         setEditMode(false);
+        
+        // Update stats for the current member
         setStats((prev) => prev ? { ...prev, name, email } : prev);
         
-        // Update family members list if this is a family
+        // For families, handle email updates (backend updates all family members automatically)
         if (isFamily) {
-          setFamilyMembers(prev => prev.map(member => 
-            member.id === memberIdToUpdate 
-              ? { ...member, name, email }
-              : member
-          ));
-        }
-        
-        // Update localStorage email if this is the main member
-        if (memberIdToUpdate === memberId) {
+          const currentEmail = familyMembers.find(m => m.id === memberIdToUpdate)?.email;
+          
+          // If email changed, update ALL family members' emails (since backend updates them all)
+          if (currentEmail && currentEmail !== email) {
+            setFamilyMembers(prev => prev.map(member => ({
+              ...member,
+              email: email  // Update ALL family members' emails
+            })));
+            
+            // Update localStorage with new family email
+            localStorage.setItem("member_email", email);
+            
+            // Refresh family members from server to ensure consistency
+            setTimeout(() => {
+              const fetchUpdatedFamilyMembers = async () => {
+                try {
+                  const response = await fetch(`${API_URL}/family/members/${encodeURIComponent(email)}`);
+                  if (response.ok) {
+                    const data = await response.json();
+                    setFamilyMembers(data || []);
+                  }
+                } catch (e) {
+                  console.error('Error refreshing family members:', e);
+                }
+              };
+              fetchUpdatedFamilyMembers();
+            }, 500);
+          } else {
+            // Only name changed, update just this member
+            setFamilyMembers(prev => prev.map(member => 
+              member.id === memberIdToUpdate 
+                ? { ...member, name, email }
+                : member
+            ));
+          }
+        } else {
+          // Individual member - update localStorage if needed
           localStorage.setItem("member_email", email);
         }
       } else {
         const data = await res.json();
+        console.log('🔍 Debug: Error response', data);
         setEditError(data.detail || 'Failed to update profile.');
       }
     } catch (err) {
+      console.error('Update error:', err);
+      console.log('🔍 Debug: Full error object', err);
       setEditError('Network error. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -433,7 +492,25 @@ function MemberStats({ memberId }: Props) {
               className="space-y-4"
               onSubmit={async (e) => {
                 e.preventDefault();
-                await handleMemberUpdate(selectedMemberId, editName, editEmail);
+                
+                // Basic validation
+                if (!editName.trim()) {
+                  setEditError('Name is required.');
+                  return;
+                }
+                
+                if (!editEmail.trim()) {
+                  setEditError('Email is required.');
+                  return;
+                }
+                
+                // Validate full name (first and last)
+                if (!/^\s*\S+\s+\S+/.test(editName.trim())) {
+                  setEditError('Please enter your full name (first and last).');
+                  return;
+                }
+                
+                await handleMemberUpdate(selectedMemberId, editName.trim(), editEmail.trim());
               }}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -463,22 +540,32 @@ function MemberStats({ memberId }: Props) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                  disabled={isUpdating}
+                  className={`font-semibold px-6 py-3 rounded-lg transition-colors duration-200 flex items-center gap-2 ${
+                    isUpdating 
+                      ? 'bg-gray-600 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  } text-white`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Save Changes
+                  {isUpdating ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
-                  className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200"
+                  disabled={isUpdating}
+                  className="bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200"
                   onClick={() => { 
                     setEditMode(false); 
                     setEditError(''); 
                     setEditSuccess('');
-                    setEditName(stats.name || '');
-                    setEditEmail(stats.email || '');
+                    setEditName(selectedMember?.name || stats.name || '');
+                    setEditEmail(selectedMember?.email || stats.email || '');
                   }}
                 >
                   Cancel
@@ -510,7 +597,11 @@ function MemberStats({ memberId }: Props) {
               <button
                 type="button"
                 className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                onClick={() => setEditMode(true)}
+                onClick={() => {
+                  setEditMode(true);
+                  setEditError('');
+                  setEditSuccess('');
+                }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

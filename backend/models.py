@@ -56,8 +56,8 @@ class MemberCreate(MemberBase):
     pass
 
 class MemberUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
+    name: str
+    email: str
 
 class MemberOut(MemberBase):
     id: uuid.UUID
