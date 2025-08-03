@@ -52,19 +52,6 @@ const QRCodeGenerator: FC<QRCodeGeneratorProps> = ({ data, size = 160 }) => {
         <div className="mt-3 text-xs text-purple-200 text-center">
           Long-press the QR code to save it to your Photos.
         </div>
-        <button
-          onClick={() => {
-            if (imgUrl) {
-              const link = document.createElement('a');
-              link.href = imgUrl;
-              link.download = 'mas-qr-code.png';
-              link.click();
-            }
-          }}
-          className="mt-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-lg transition-colors duration-200"
-        >
-          Download QR Code
-        </button>
       </div>
     </div>
   );

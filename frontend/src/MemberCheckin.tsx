@@ -379,32 +379,66 @@ function MemberCheckin() {
                     const API_URL = getApiUrl();
 
                     try {
-                      const response = await fetch(`${API_URL}/member/register-only`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          name: formName.trim(),
-                          email: formEmail.trim(),
-                        }),
-                      });
+                      // Check if this is a family registration
+                      if (isFamily && familyNames.length > 0) {
+                        // Family registration
+                        const allMembers = [formName.trim(), ...familyNames.filter(n => n.trim())];
+                        const response = await fetch(`${API_URL}/family/register`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            email: formEmail.trim(),
+                            members: allMembers.map(name => ({ name }))
+                          }),
+                        });
 
-                                             if (response.ok) {
-                         const result = await response.json();
-                         console.log("✅ Registration successful:", result);
-                         
-                         // Store member data and redirect to profile
-                         localStorage.setItem("member_email", formEmail.trim());
-                         localStorage.setItem("member_id", result.member.id);
-                         localStorage.removeItem("family_members");
-                         
-                         // Redirect to profile page
-                         window.location.href = `/profile?id=${result.member.id}`;
-                         return;
+                        if (response.ok) {
+                          const result = await response.json();
+                          console.log("✅ Family registration successful:", result);
+                          
+                          // Store family data and redirect to family profile
+                          localStorage.setItem("member_email", formEmail.trim());
+                          const memberNames = result.members.map((m: any) => m.name);
+                          localStorage.setItem("family_members", JSON.stringify(memberNames));
+                          
+                          // Redirect to family profile page
+                          window.location.href = `/profile?email=${encodeURIComponent(formEmail.trim())}`;
+                          return;
+                        } else {
+                          const error = await response.json();
+                          setStatus("error");
+                          setMessage(error.detail || "Family registration failed. Please try again.");
+                          return;
+                        }
                       } else {
-                        const error = await response.json();
-                        setStatus("error");
-                        setMessage(error.detail || "Registration failed. Please try again.");
-                        return;
+                        // Individual registration
+                        const response = await fetch(`${API_URL}/member/register-only`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            name: formName.trim(),
+                            email: formEmail.trim(),
+                          }),
+                        });
+
+                        if (response.ok) {
+                          const result = await response.json();
+                          console.log("✅ Registration successful:", result);
+                          
+                          // Store member data and redirect to profile
+                          localStorage.setItem("member_email", formEmail.trim());
+                          localStorage.setItem("member_id", result.member.id);
+                          localStorage.removeItem("family_members");
+                          
+                          // Redirect to profile page
+                          window.location.href = `/profile?id=${result.member.id}`;
+                          return;
+                        } else {
+                          const error = await response.json();
+                          setStatus("error");
+                          setMessage(error.detail || "Registration failed. Please try again.");
+                          return;
+                        }
                       }
                     } catch (error) {
                       console.error("❌ Registration error:", error);
@@ -553,8 +587,9 @@ function MemberCheckin() {
                           
                           // For sign-in flow, redirect to profile after successful check-in
                           if (familyMemberNames.length > 1) {
-                            setStatus("success");
-                            setMessage("All family members have checked in for this period!");
+                            // Family - redirect to family profile using email
+                            window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
+                            return;
                           } else {
                             // Single member - redirect to profile
                             window.location.href = `/profile?id=${existingMembers[0].id}`;
@@ -827,8 +862,9 @@ function MemberCheckin() {
                           
                           // For sign-in flow, redirect to profile after successful check-in
                           if (familyMemberNames.length > 1) {
-                            setStatus("success");
-                            setMessage("All family members have checked in for this period!");
+                            // Family - redirect to family profile using email
+                            window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
+                            return;
                           } else {
                             // Single member - redirect to profile
                             window.location.href = `/profile?id=${existingMembers[0].id}`;

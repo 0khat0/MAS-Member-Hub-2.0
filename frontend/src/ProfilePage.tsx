@@ -12,11 +12,29 @@ function ProfilePage() {
 
 
   useEffect(() => {
-    // Check URL parameter first
+    // Check URL parameters - support both member ID and family email
     const urlMemberId = searchParams.get('id');
+    const urlEmail = searchParams.get('email');
     
-    if (urlMemberId) {
-      // If URL has member ID, save it to localStorage and use it
+    if (urlEmail) {
+      // Family profile via email - store family email and use localStorage to get family member IDs
+      localStorage.setItem("member_email", urlEmail);
+      
+      // Try to get the first family member ID from localStorage or fetch family members
+      const savedFamilyMembers = localStorage.getItem('family_members');
+      if (savedFamilyMembers) {
+        // We have family members stored, we'll handle member selection in MemberStats
+        setMemberIdState('family'); // Use a special flag for family mode
+      } else {
+        // No family members cached, we'll fetch them in MemberStats
+        setMemberIdState('family');
+      }
+      setIsLoading(false);
+      
+      // Replace browser history to keep family email
+      window.history.replaceState(null, '', `/profile?email=${encodeURIComponent(urlEmail)}`);
+    } else if (urlMemberId) {
+      // Individual member profile via member ID
       setMemberId(urlMemberId);
       setMemberIdState(urlMemberId);
       setIsLoading(false);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { isValidUUID, getApiUrl, clearMemberData, getTorontoTime, getTorontoDateString, getMondayOfCurrentWeekToronto } from './utils';
+import { isValidUUID, getApiUrl, clearMemberData, getTorontoTime, getTorontoDateString, getTorontoDateTimeString, getMondayOfCurrentWeekToronto } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
 
 interface MemberStats {
@@ -52,7 +52,21 @@ function MemberStats({ memberId }: Props) {
   const selectedMember = familyMembers.find(m => m.id === selectedMemberId);
 
   useEffect(() => {
-    // Check if this is a family account
+    // Handle family mode
+    if (memberId === 'family') {
+      setIsFamily(true);
+      // In family mode, we'll fetch family members and then get stats for the selected member
+      const memberEmail = localStorage.getItem('member_email');
+      if (!memberEmail) {
+        setError('No family email found. Please check in again.');
+        setIsLoading(false);
+        return;
+      }
+      // We'll handle fetching family members and stats in the family fetch effect below
+      return;
+    }
+
+    // Check if this is a family account (legacy individual member ID approach)
     const savedFamilyMembers = localStorage.getItem('family_members');
     if (savedFamilyMembers) {
       try {
@@ -138,6 +152,13 @@ function MemberStats({ memberId }: Props) {
             localStorage.setItem('family_members', JSON.stringify(memberNames));
             // If only one member, switch to single-user mode
             setIsFamily((data || []).length > 1);
+            
+            // For family mode, also set the first member as selected if no member is selected
+            if (memberId === 'family' && data && data.length > 0) {
+              setSelectedMemberId(data[0].id);
+              setEditName(data[0].name);
+              setEditEmail(data[0].email);
+            }
           }
         } catch (e) {
           // Ignore errors
@@ -260,6 +281,55 @@ function MemberStats({ memberId }: Props) {
       setEditEmail(selectedMember.email || '');
     }
   }, [selectedMemberId, familyMembers]);
+
+  // Fetch stats for selected member in family mode
+  useEffect(() => {
+    if (memberId === 'family' && selectedMemberId && isValidUUID(selectedMemberId)) {
+      const fetchSelectedMemberStats = async () => {
+        try {
+          setIsLoading(true);
+          const API_URL = getApiUrl();
+          const response = await fetch(`${API_URL}/member/${selectedMemberId}/stats`);
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              setError('Member not found. Please check in again.');
+              clearMemberData();
+              return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          setStats(data);
+          setError(null);
+
+          // Calculate weekly check-ins for the selected member
+          if (data && data.check_in_dates) {
+            const torontoDateTimeString = getTorontoDateTimeString();
+            const todayString = torontoDateTimeString.split(',')[0]; 
+            const monday = getMondayOfCurrentWeekToronto();
+            const mondayString = getTorontoDateString(monday);
+            
+            const weekCheckins = data.check_in_dates.filter((d: string) => {
+              const checkinDateString = d.split('T')[0];
+              return checkinDateString >= mondayString && checkinDateString <= todayString;
+            }).length;
+            setWeeklyCheckins(weekCheckins);
+          } else {
+            setWeeklyCheckins(0);
+          }
+        } catch (error) {
+          console.error('Error fetching selected member stats:', error);
+          setError('Network error. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchSelectedMemberStats();
+    }
+  }, [selectedMemberId, memberId]);
 
   if (isLoading) {
     return (
