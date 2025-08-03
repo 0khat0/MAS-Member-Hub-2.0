@@ -31,7 +31,18 @@ function MemberStats({ memberId }: Props) {
   const [stats, setStats] = useState<MemberStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [goal, setGoal] = useState<number>(DEFAULT_GOAL);
+  
+  // Initialize goal from localStorage immediately
+  const getInitialGoal = () => {
+    if (memberId && isValidUUID(memberId)) {
+      const memberKey = `checkin_goal_${memberId}`;
+      const saved = localStorage.getItem(memberKey);
+      return saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+    }
+    return DEFAULT_GOAL;
+  };
+  
+  const [goal, setGoal] = useState<number>(getInitialGoal());
   const [weeklyCheckins, setWeeklyCheckins] = useState<number>(0);
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState('');
@@ -48,6 +59,23 @@ function MemberStats({ memberId }: Props) {
 
   // Declare selectedMember early to prevent initialization errors
   const selectedMember = familyMembers.find(m => m.id === selectedMemberId);
+
+  // Immediate goal loading on component mount
+  useEffect(() => {
+    console.log('🔍 Component Mount - Loading Goal:', {
+      memberId,
+      isFamily,
+      isValidUUID: isValidUUID(memberId)
+    });
+    
+    if (memberId && isValidUUID(memberId)) {
+      const memberKey = `checkin_goal_${memberId}`;
+      const saved = localStorage.getItem(memberKey);
+      const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      console.log('🔍 Initial Goal Load:', { memberId, memberKey, saved, newGoal });
+      setGoal(newGoal);
+    }
+  }, []); // Empty dependency array - runs only on mount
 
   useEffect(() => {
     // Handle family mode
@@ -326,31 +354,77 @@ function MemberStats({ memberId }: Props) {
     }
   };
 
-  // Load goal for current member (family or individual)
+  // Load goal from localStorage when component mounts or selected member changes
   useEffect(() => {
+    console.log('🔍 Goal Loading Effect Triggered:', {
+      isFamily,
+      selectedMemberId,
+      memberId,
+      familyMembersLength: familyMembers.length,
+      familyFetchComplete
+    });
+    
     if (isFamily && selectedMemberId && familyMembers.length > 0 && familyFetchComplete) {
       // For family members, load goal for the selected member
       const memberKey = `checkin_goal_${selectedMemberId}`;
       const saved = localStorage.getItem(memberKey);
       const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      console.log('🔍 Loading Family Goal:', { selectedMemberId, memberKey, saved, newGoal });
       setGoal(newGoal);
     } else if (!isFamily && memberId && isValidUUID(memberId)) {
       // For individual members, load goal for the member
       const memberKey = `checkin_goal_${memberId}`;
       const saved = localStorage.getItem(memberKey);
       const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      console.log('🔍 Loading Individual Goal:', { memberId, memberKey, saved, newGoal });
       setGoal(newGoal);
     }
   }, [familyMembers.length, selectedMemberId, memberId, isFamily, familyFetchComplete]);
+
+  // Additional useEffect for individual member goal loading (doesn't depend on familyFetchComplete)
+  useEffect(() => {
+    console.log('🔍 Individual Goal Loading Effect:', {
+      isFamily,
+      memberId,
+      isValidUUID: isValidUUID(memberId)
+    });
+    
+    if (!isFamily && memberId && isValidUUID(memberId)) {
+      const memberKey = `checkin_goal_${memberId}`;
+      const saved = localStorage.getItem(memberKey);
+      const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      console.log('🔍 Goal Loading Debug:', {
+        memberId,
+        memberKey,
+        saved,
+        newGoal,
+        isFamily,
+        isValidUUID: isValidUUID(memberId)
+      });
+      setGoal(newGoal);
+    }
+  }, [memberId, isFamily]);
 
   // Save goal when it changes
   useEffect(() => {
     if (isFamily && selectedMemberId) {
       const memberKey = `checkin_goal_${selectedMemberId}`;
       localStorage.setItem(memberKey, goal.toString());
+      console.log('🔍 Goal Saving Debug (Family):', {
+        selectedMemberId,
+        memberKey,
+        goal,
+        savedValue: goal.toString()
+      });
     } else if (!isFamily && memberId && isValidUUID(memberId)) {
       const memberKey = `checkin_goal_${memberId}`;
       localStorage.setItem(memberKey, goal.toString());
+      console.log('🔍 Goal Saving Debug (Individual):', {
+        memberId,
+        memberKey,
+        goal,
+        savedValue: goal.toString()
+      });
     }
   }, [goal, memberId, isFamily, selectedMemberId]);
 
