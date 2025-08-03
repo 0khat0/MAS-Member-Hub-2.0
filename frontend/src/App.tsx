@@ -22,6 +22,13 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Footer component
+const Footer = () => (
+  <footer className="text-gray-400 text-center py-3 px-4 mx-4 mb-4 mt-auto">
+    <span>Built with ❤️ by Omar Khatib | Report Issues | v2.0</span>
+  </footer>
+);
+
 function App() {
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
@@ -43,44 +50,19 @@ function AppContent() {
   // Get validated memberId from localStorage for profile
   const memberId = getMemberId();
 
+  // If user is logged in and tries to access check-in page, redirect to profile
+  useEffect(() => {
+    if (memberId && (location.pathname === "/checkin" || location.pathname === "/")) {
+      window.location.href = `/profile?id=${memberId}`;
+    }
+  }, [memberId, location.pathname]);
+
   return (
-    <div className="bg-gray-900 text-white">
-      {/* Mobile-optimized navigation */}
-      {!isAdminRoute && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 z-50 safe-area-pb">
-          <div className="max-w-lg mx-auto px-4 py-2 flex justify-around items-center">
-            <Link 
-              to="/checkin" 
-              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${
-                location.pathname === "/checkin" || location.pathname === "/"
-                  ? "text-red-500 bg-red-500/10" 
-                  : "text-white/70 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-              <span className="text-xs mt-1 font-medium">Check-In</span>
-            </Link>
-            <Link
-              to="/profile"
-              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${
-                location.pathname === "/profile"
-                  ? "text-blue-500 bg-blue-500/10"
-                  : "text-white/70 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="text-xs mt-1 font-medium">Profile</span>
-            </Link>
-          </div>
-        </nav>
-      )}
+    <div className="bg-gray-900 text-white min-h-screen flex flex-col">
+      {/* Bottom navigation removed - users navigate via registration/sign-in flow */}
 
       {/* Main content with page transitions */}
-      <main className="pb-20">
+      <main className="flex-1">
         <Suspense fallback={<LoadingSpinner />}>
           <ErrorBoundary>
             <AnimatePresence mode="wait">
@@ -131,6 +113,9 @@ function AppContent() {
           </ErrorBoundary>
         </Suspense>
       </main>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

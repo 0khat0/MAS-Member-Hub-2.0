@@ -237,19 +237,7 @@ function MemberCheckin() {
           </motion.div>
         )}
         {/* SUCCESS STATE: Single user after check-in - ONLY show green message for single */}
-        {status === "success" && (familyMembers.length <= 1 || !familyMembers.length) && (
-          <motion.div
-            className="w-full max-w-md"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="glass-card bg-gradient-to-r from-green-800 via-green-700 to-green-600 p-6 text-center">
-              <p className="text-xl font-semibold text-white">✓ {message || "Check-in successful! Welcome back."}</p>
-              <p className="mt-2 text-lg text-white/90 font-medium">{getDailyMuayThaiMessage()}</p>
-            </div>
-          </motion.div>
-        )}
+        {/* Success message removed - users are redirected to profile instead */}
 
         {/* FAMILY SELECTION STATE: Some family members not checked in - ONLY show family selection */}
         {status === "register" && familyMembers.length > 1 && notCheckedInMembers.length > 0 && !checkinStatusLoading && (
@@ -400,17 +388,18 @@ function MemberCheckin() {
                         }),
                       });
 
-                      if (response.ok) {
-                        const result = await response.json();
-                        console.log("✅ Registration successful:", result);
-                        
-                        // Store member data and redirect to profile
-                        localStorage.setItem("member_email", formEmail.trim());
-                        localStorage.setItem("member_id", result.member.id);
-                        localStorage.removeItem("family_members");
-                        
-                        window.location.href = `/profile?id=${result.member.id}`;
-                        return;
+                                             if (response.ok) {
+                         const result = await response.json();
+                         console.log("✅ Registration successful:", result);
+                         
+                         // Store member data and redirect to profile
+                         localStorage.setItem("member_email", formEmail.trim());
+                         localStorage.setItem("member_id", result.member.id);
+                         localStorage.removeItem("family_members");
+                         
+                         // Redirect to profile page
+                         window.location.href = `/profile?id=${result.member.id}`;
+                         return;
                       } else {
                         const error = await response.json();
                         setStatus("error");
@@ -561,11 +550,15 @@ function MemberCheckin() {
                         if (familyCheckinRes.ok) {
                           const checkinResult = await familyCheckinRes.json();
                           console.log("✅ Check-in successful:", checkinResult);
-                      setStatus("success");
+                          
+                          // For sign-in flow, redirect to profile after successful check-in
                           if (familyMemberNames.length > 1) {
+                            setStatus("success");
                             setMessage("All family members have checked in for this period!");
                           } else {
-                            setMessage("Check-in successful! Welcome back.");
+                            // Single member - redirect to profile
+                            window.location.href = `/profile?id=${existingMembers[0].id}`;
+                            return;
                           }
                         } else {
                           const err = await familyCheckinRes.json();
@@ -831,11 +824,15 @@ function MemberCheckin() {
                         if (familyCheckinRes.ok) {
                           const checkinResult = await familyCheckinRes.json();
                           console.log("✅ Check-in successful:", checkinResult);
-                          setStatus("success");
+                          
+                          // For sign-in flow, redirect to profile after successful check-in
                           if (familyMemberNames.length > 1) {
+                            setStatus("success");
                             setMessage("All family members have checked in for this period!");
                           } else {
-                            setMessage("Check-in successful! Welcome back.");
+                            // Single member - redirect to profile
+                            window.location.href = `/profile?id=${existingMembers[0].id}`;
+                            return;
                           }
                         } else {
                           const err = await familyCheckinRes.json();
