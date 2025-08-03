@@ -5,7 +5,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
 import ProfilePage from "./ProfilePage";
-import { getMemberId } from "./utils";
+import { getMemberId, reportIssue } from "./utils";
 
 // Lazy load components for better performance
 const MemberCheckin = lazy(() => import("./MemberCheckin"));
@@ -25,7 +25,16 @@ const LoadingSpinner = () => (
 // Footer component
 const Footer = () => (
   <footer className="text-gray-400 text-center py-3 px-4 mx-4 mb-4 mt-auto">
-    <span>Built with ❤️ by Omar Khatib | Report Issues | v2.0</span>
+    <span>
+      Built with ❤️ by Omar Khatib | 
+      <button 
+        onClick={reportIssue}
+        className="text-gray-400 hover:text-white underline transition-colors duration-200"
+      >
+        Report Issues
+      </button> 
+      | v2.0
+    </span>
   </footer>
 );
 

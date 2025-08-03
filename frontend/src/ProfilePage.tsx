@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { getMemberId, setMemberId, clearMemberData } from './utils';
+import { getMemberId, setMemberId, clearMemberData, reportIssue } from './utils';
 import MemberStats from './MemberStats';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,8 +9,7 @@ function ProfilePage() {
   const [memberId, setMemberIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showToolMenu, setShowToolMenu] = useState(false);
-  const [debugMessage, setDebugMessage] = useState('');
-  const [showDebugForm, setShowDebugForm] = useState(false);
+
 
   useEffect(() => {
     // Check URL parameter first
@@ -70,21 +69,8 @@ function ProfilePage() {
     window.location.href = '/checkin';
   };
 
-  const handleDebugSubmit = async () => {
-    if (!debugMessage.trim()) return;
-    
-    // For now, just log the debug message
-    console.log('Debug message submitted:', debugMessage);
-    
-    // You can add API call here later
-    // const response = await fetch('/api/debug', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ message: debugMessage, memberId })
-    // });
-    
-    setDebugMessage('');
-    setShowDebugForm(false);
+  const handleReportIssue = () => {
+    reportIssue();
     setShowToolMenu(false);
   };
 
@@ -124,7 +110,7 @@ function ProfilePage() {
                   Logout
                 </button>
                 <button
-                  onClick={() => setShowDebugForm(true)}
+                  onClick={handleReportIssue}
                   className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,48 +123,7 @@ function ProfilePage() {
           )}
         </AnimatePresence>
 
-        {/* Debug form modal */}
-        <AnimatePresence>
-          {showDebugForm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-              onClick={() => setShowDebugForm(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-xl font-semibold text-white mb-4">Report an Issue</h3>
-                <textarea
-                  value={debugMessage}
-                  onChange={(e) => setDebugMessage(e.target.value)}
-                  placeholder="Describe the issue you encountered..."
-                  className="w-full h-32 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                />
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={handleDebugSubmit}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
-                  >
-                    Submit
-                  </button>
-                  <button
-                    onClick={() => setShowDebugForm(false)}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
       </div>
       
       <MemberStats memberId={memberId} />

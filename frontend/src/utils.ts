@@ -67,4 +67,28 @@ export function setMemberId(memberId: string): void {
 export function clearMemberData(): void {
   localStorage.removeItem("member_id");
   localStorage.removeItem("member_email");
+}
+
+// Report issue utility
+export function reportIssue(): void {
+  const subject = encodeURIComponent('MAS Member Hub - Issue Report');
+  const body = encodeURIComponent(`Hello Omar,
+
+I'm reporting an issue with the MAS Member Hub application.
+
+Issue Description:
+[Please describe the issue you encountered]
+
+Steps to Reproduce:
+[Please list the steps to reproduce the issue]
+
+Additional Information:
+- Browser: ${navigator.userAgent}
+- URL: ${window.location.href}
+- Date: ${new Date().toISOString()}
+- Member ID: ${getMemberId() || 'Not logged in'}
+
+Thank you for your time!`);
+  
+  window.open(`mailto:omark0620@outlook.com?subject=${subject}&body=${body}`, '_blank');
 } 
