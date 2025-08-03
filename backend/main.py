@@ -1038,7 +1038,7 @@ async def lookup_member_by_barcode(request: Request, barcode: str, db: Session =
 @app.post("/checkin-by-barcode")
 @limiter.limit("50/minute")  # Higher limit for scanning operations
 async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session = Depends(get_db)):
-    """Check in a member using their barcode"""
+    """Check in a member using their barcode - automatically handles family check-ins"""
     barcode = checkin_data.get("barcode")
     
     if not barcode:
@@ -1059,7 +1059,7 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day + timedelta(days=1)
     
-    # Check if member already checked in today (Toronto time)
+    # Check if this member already checked in today
     existing_checkin = db.query(models.Checkin).filter(
         models.Checkin.member_id == member.id,
         models.Checkin.timestamp >= start_of_day,
@@ -1069,22 +1069,70 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
     if existing_checkin:
         raise HTTPException(status_code=409, detail=f"{member.name} has already checked in today")
     
-    # Create check-in record
-    checkin = models.Checkin(member_id=member.id)
-    db.add(checkin)
-    db.commit()
-    db.refresh(checkin)
+    # Check if this is a family (multiple members with same email)
+    family_members = db.query(models.Member).filter(
+        models.Member.email == member.email,
+        models.Member.deleted_at.is_(None)
+    ).all()
     
-    # Update metrics
-    CHECKIN_COUNT.inc()
-    
-    logger.info("Member checked in by barcode", member_id=str(member.id), barcode=barcode, checkin_id=str(checkin.id))
-    
-    return {
-        "message": f"{member.name} checked in successfully!",
-        "member": models.MemberOut.model_validate(member),
-        "checkin_id": str(checkin.id),
-        "timestamp": checkin.timestamp
-    }
+    if len(family_members) > 1:
+        # This is a family - check in all family members
+        checked_in_members = []
+        for family_member in family_members:
+            # Check if this family member already checked in today
+            existing_family_checkin = db.query(models.Checkin).filter(
+                models.Checkin.member_id == family_member.id,
+                models.Checkin.timestamp >= start_of_day,
+                models.Checkin.timestamp < end_of_day
+            ).first()
+            
+            if not existing_family_checkin:
+                # Create check-in for this family member
+                family_checkin = models.Checkin(member_id=family_member.id)
+                db.add(family_checkin)
+                checked_in_members.append(family_member.name)
+        
+        db.commit()
+        
+        # Update metrics
+        CHECKIN_COUNT.inc(len(checked_in_members))
+        
+        logger.info("Family checked in by barcode", 
+                   primary_member_id=str(member.id), 
+                   barcode=barcode, 
+                   family_size=len(family_members),
+                   checked_in_count=len(checked_in_members))
+        
+        return {
+            "message": f"Family check-in successful! {len(checked_in_members)} members checked in.",
+            "family_checkin": True,
+            "member_count": len(checked_in_members),
+            "family_size": len(family_members),
+            "checked_in_members": checked_in_members,
+            "primary_member": models.MemberOut.model_validate(member)
+        }
+    else:
+        # Individual member
+        checkin = models.Checkin(member_id=member.id)
+        db.add(checkin)
+        db.commit()
+        db.refresh(checkin)
+        
+        # Update metrics
+        CHECKIN_COUNT.inc()
+        
+        logger.info("Individual member checked in by barcode", 
+                   member_id=str(member.id), 
+                   barcode=barcode, 
+                   checkin_id=str(checkin.id))
+        
+        return {
+            "message": f"{member.name} checked in successfully!",
+            "family_checkin": False,
+            "member_name": member.name,
+            "member": models.MemberOut.model_validate(member),
+            "checkin_id": str(checkin.id),
+            "timestamp": checkin.timestamp
+        }
 
 # Admin authentication removed - admin routes are now open access 

@@ -27,6 +27,11 @@ function AdminDashboard() {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
 
+  // Scanner functionality
+  const [scannerInput, setScannerInput] = useState("");
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [scanMessage, setScanMessage] = useState("");
+
   // Authentication check removed - admin access is now open
 
   useEffect(() => {
@@ -95,6 +100,48 @@ function AdminDashboard() {
     return format(new Date(dateString), 'MMM d, yyyy');
   };
 
+  // Scanner functions
+  const handleScannerInput = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannerInput.trim()) return;
+
+    setIsProcessingScan(true);
+    setScanMessage("Processing scan...");
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const barcode = scannerInput.trim();
+      
+      // Direct check-in by barcode
+      const checkinResponse = await fetch(`${API_URL}/checkin-by-barcode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barcode }),
+      });
+      
+      if (checkinResponse.ok) {
+        const result = await checkinResponse.json();
+        if (result.family_checkin) {
+          setScanMessage(`✅ Family check-in successful! ${result.member_count} members checked in.`);
+        } else {
+          setScanMessage(`✅ ${result.member_name} checked in successfully!`);
+        }
+        setScannerInput("");
+        fetchTodayCheckins(); // Refresh the check-ins list
+      } else {
+        const errorData = await checkinResponse.json();
+        setScanMessage(`❌ ${errorData.detail || "Check-in failed. Please try again."}`);
+      }
+    } catch (error) {
+      console.error('Scanner error:', error);
+      setScanMessage("❌ Network error. Please try again.");
+    } finally {
+      setIsProcessingScan(false);
+      // Clear message after 3 seconds
+      setTimeout(() => setScanMessage("") , 3000);
+    }
+  };
+
   // Login handler removed - admin access is now open
 
 
@@ -112,6 +159,46 @@ function AdminDashboard() {
         >
           MAS Academy Member Hub - Admin Dashboard
         </motion.h1>
+
+        {/* Hidden Scanner Input - Invisible Magic Scanner */}
+        <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden">
+          <input
+            type="text"
+            value={scannerInput}
+            onChange={(e) => {
+              setScannerInput(e.target.value);
+              // Auto-submit when scanner inputs data (scanner adds Enter key)
+              if (e.target.value.trim()) {
+                handleScannerInput(e as any);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && scannerInput.trim()) {
+                handleScannerInput(e as any);
+              }
+            }}
+            className="opacity-0 absolute -top-100"
+            autoFocus
+            placeholder=""
+          />
+        </div>
+
+        {/* Scanner Status Message */}
+        {scanMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`fixed top-4 right-4 p-4 rounded-lg text-sm font-medium z-50 ${
+              scanMessage.includes("✅") 
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : scanMessage.includes("❌")
+                ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+            }`}
+          >
+            {scanMessage}
+          </motion.div>
+        )}
 
         {/* Debug Timezone Info */}
         <motion.div 

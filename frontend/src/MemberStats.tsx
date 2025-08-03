@@ -31,10 +31,7 @@ function MemberStats({ memberId }: Props) {
   const [stats, setStats] = useState<MemberStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [goal, setGoal] = useState<number>(() => {
-    const saved = localStorage.getItem('checkin_goal');
-    return saved ? parseInt(saved, 10) : DEFAULT_GOAL;
-  });
+  const [goal, setGoal] = useState<number>(DEFAULT_GOAL);
   const [weeklyCheckins, setWeeklyCheckins] = useState<number>(0);
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState('');
@@ -329,9 +326,33 @@ function MemberStats({ memberId }: Props) {
     }
   };
 
+  // Load goal for current member (family or individual)
   useEffect(() => {
-    localStorage.setItem('checkin_goal', goal.toString());
-  }, [goal]);
+    if (isFamily && selectedMemberId && familyMembers.length > 0 && familyFetchComplete) {
+      // For family members, load goal for the selected member
+      const memberKey = `checkin_goal_${selectedMemberId}`;
+      const saved = localStorage.getItem(memberKey);
+      const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      setGoal(newGoal);
+    } else if (!isFamily && memberId && isValidUUID(memberId)) {
+      // For individual members, load goal for the member
+      const memberKey = `checkin_goal_${memberId}`;
+      const saved = localStorage.getItem(memberKey);
+      const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
+      setGoal(newGoal);
+    }
+  }, [familyMembers.length, selectedMemberId, memberId, isFamily, familyFetchComplete]);
+
+  // Save goal when it changes
+  useEffect(() => {
+    if (isFamily && selectedMemberId) {
+      const memberKey = `checkin_goal_${selectedMemberId}`;
+      localStorage.setItem(memberKey, goal.toString());
+    } else if (!isFamily && memberId && isValidUUID(memberId)) {
+      const memberKey = `checkin_goal_${memberId}`;
+      localStorage.setItem(memberKey, goal.toString());
+    }
+  }, [goal, memberId, isFamily, selectedMemberId]);
 
   // When switching selectedMemberId, update editName and editEmail to match the selected member
   useEffect(() => {
@@ -364,14 +385,15 @@ function MemberStats({ memberId }: Props) {
           setError(null);
 
           // Calculate weekly check-ins for the selected member
-          if (data && data.check_in_dates) {
-            const torontoDateTimeString = getTorontoDateTimeString();
-            const todayString = torontoDateTimeString.split(',')[0]; 
-            const monday = getMondayOfCurrentWeekToronto();
+          if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
+            const now = getTorontoTime();
+            const monday = getMondayOfCurrentWeekToronto(now);
+            
             const mondayString = getTorontoDateString(monday);
+            const todayString = getTorontoDateString(now);
             
             const weekCheckins = data.check_in_dates.filter((d: string) => {
-              const checkinDateString = d.split('T')[0];
+              const checkinDateString = d.split('T')[0]; // Get just the date part from ISO string
               return checkinDateString >= mondayString && checkinDateString <= todayString;
             }).length;
             setWeeklyCheckins(weekCheckins);
@@ -436,13 +458,11 @@ function MemberStats({ memberId }: Props) {
           {(() => {
             let qrData = null;
             if (isFamily && familyMembers.length > 1) {
-              // For family, create a simple text format that's easier to scan
-              const familyText = `FAMILY:${stats.email}|${familyMembers.map(m => `${m.name}:${(m as any).barcode}`).join(',')}`;
-              qrData = familyText;
-            } else if (stats.barcode && stats.email) {
-              // For individual member, create a simple text format that's easier to scan
-              const memberText = `MEMBER:${stats.name}|${stats.email}|${stats.barcode}`;
-              qrData = memberText;
+              // For family, use the primary member's barcode
+              qrData = stats.barcode;
+            } else if (stats.barcode) {
+              // For individual member, just use the barcode
+              qrData = stats.barcode;
             }
             return qrData ? (
               <QRCodeGenerator data={qrData} />
@@ -704,4 +724,4 @@ function MemberStats({ memberId }: Props) {
   );
 }
 
-export default MemberStats; 
+export default MemberStats;
