@@ -27,6 +27,12 @@ function AdminDashboard() {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
 
+  // Member editing functionality
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [isUpdatingMember, setIsUpdatingMember] = useState(false);
+
   // Scanner functionality
   const [scannerInput, setScannerInput] = useState("");
   const [isProcessingScan, setIsProcessingScan] = useState(false);
@@ -47,8 +53,6 @@ function AdminDashboard() {
     }, 3500); // every 3.5 seconds
     return () => clearInterval(interval); // cleanup on unmount
   }, []);
-
-
 
   const fetchTodayCheckins = async () => {
     try {
@@ -100,6 +104,86 @@ function AdminDashboard() {
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'MMM d, yyyy');
+  };
+
+  // Member management functions
+  const handleEditMember = (member: Member) => {
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditEmail(member.email);
+  };
+
+  const handleUpdateMember = async () => {
+    if (!editingMember || !editName.trim() || !editEmail.trim()) return;
+
+    setIsUpdatingMember(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_URL}/member/${editingMember.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editName.trim(),
+          email: editEmail.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        // Update the member in the local state
+        setMembers(prevMembers => 
+          prevMembers.map(member => 
+            member.id === editingMember.id 
+              ? { ...member, name: editName.trim(), email: editEmail.trim() }
+              : member
+          )
+        );
+        setEditingMember(null);
+        setEditName("");
+        setEditEmail("");
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update member: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating member:', error);
+      alert('Failed to update member. Please try again.');
+    } finally {
+      setIsUpdatingMember(false);
+    }
+  };
+
+  const handleDeleteMember = async (member: Member) => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${member.name}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_URL}/member/${member.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove the member from local state
+        setMembers(prevMembers => prevMembers.filter(m => m.id !== member.id));
+        // Refresh stats to update member count
+        fetchStats();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete member: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      alert('Failed to delete member. Please try again.');
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingMember(null);
+    setEditName("");
+    setEditEmail("");
   };
 
   // Scanner functions
@@ -177,6 +261,14 @@ function AdminDashboard() {
       setIsProcessingScan(false);
       // Clear message after 5 seconds
       setTimeout(() => setScanMessage(""), 5000);
+      
+      // Refocus input after processing (both success and error)
+      setTimeout(() => {
+        const input = document.getElementById('scanner-input') as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 100);
     }
   };
 
@@ -197,6 +289,37 @@ function AdminDashboard() {
         >
           MAS Academy Member Hub - Admin Dashboard
         </motion.h1>
+
+        {/* Hidden Scanner Input - Always Listening */}
+        <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden">
+          <input
+            type="text"
+            value=""
+            onChange={(e) => {
+              // Only process if we have input and not currently processing
+              const target = e.target as HTMLInputElement;
+              if (target.value.trim() && !isProcessingScan) {
+                console.log('🔍 Hidden Scanner: Processing barcode:', target.value);
+                setScannerInput(target.value);
+                handleScannerInput({ preventDefault: () => {} } as any);
+                target.value = ''; // Clear the hidden input
+              }
+            }}
+            onKeyDown={(e) => {
+              const target = e.target as HTMLInputElement;
+              if (e.key === 'Enter' && target.value.trim() && !isProcessingScan) {
+                e.preventDefault();
+                console.log('🔍 Hidden Scanner: Processing barcode on Enter:', target.value);
+                setScannerInput(target.value);
+                handleScannerInput({ preventDefault: () => {} } as any);
+                target.value = ''; // Clear the hidden input
+              }
+            }}
+            className="opacity-0 absolute -top-100"
+            autoFocus
+            placeholder=""
+          />
+        </div>
 
         {/* Simple Scanner Input */}
         <div className="mb-6">
@@ -264,7 +387,7 @@ function AdminDashboard() {
               isProcessingScan ? "bg-yellow-400 animate-pulse" : "bg-green-400"
             }`}></div>
             <span className="text-xs font-medium">
-              {isProcessingScan ? "Processing..." : "Scanner Ready"}
+              {isProcessingScan ? "Processing..." : "Scanner Always Listening"}
             </span>
           </div>
         </motion.div>
@@ -370,6 +493,7 @@ function AdminDashboard() {
                           <th className="text-left py-3 px-4 text-white/70 font-medium">Name</th>
                           <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
                           <th className="text-left py-3 px-4 text-white/70 font-medium">Joined</th>
+                          <th className="text-left py-3 px-4 text-white/70 font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -381,22 +505,67 @@ function AdminDashboard() {
                             key={member.id}
                             className="border-b border-white/5 hover:bg-white/5 transition-colors"
                           >
-                            <td className="py-3 px-4 text-white/90 font-medium">{member.name}</td>
-                            <td className="py-3 px-4 text-white/90">{member.email}</td>
+                            <td className="py-3 px-4 text-white/90 font-medium">
+                              {editingMember?.id === member.id ? (
+                                <input
+                                  type="text"
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isUpdatingMember}
+                                />
+                              ) : (
+                                member.name
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-white/90">
+                              {editingMember?.id === member.id ? (
+                                <input
+                                  type="email"
+                                  value={editEmail}
+                                  onChange={(e) => setEditEmail(e.target.value)}
+                                  className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isUpdatingMember}
+                                />
+                              ) : (
+                                member.email
+                              )}
+                            </td>
                             <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
                             <td className="py-3 px-4">
-                              <button
-                                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1 rounded text-xs"
-                                onClick={async () => {
-                                  if (window.confirm('Are you sure you want to permanently delete this member? This cannot be undone.')) {
-                                    const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-                                    await fetch(`${API_URL}/member/${member.id}`, { method: 'DELETE' });
-                                    await fetchMembers(); // Always await to ensure UI is in sync
-                                  }
-                                }}
-                              >
-                                Delete
-                              </button>
+                              {editingMember?.id === member.id ? (
+                                <div className="flex gap-2">
+                                  <button
+                                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                    onClick={handleUpdateMember}
+                                    disabled={isUpdatingMember}
+                                  >
+                                    {isUpdatingMember ? "Saving..." : "Save"}
+                                  </button>
+                                  <button
+                                    className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                    onClick={cancelEdit}
+                                    disabled={isUpdatingMember}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <button
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                    onClick={() => handleEditMember(member)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                    onClick={() => handleDeleteMember(member)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))}

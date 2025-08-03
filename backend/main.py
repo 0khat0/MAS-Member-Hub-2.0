@@ -910,14 +910,26 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
     if not is_valid_uuid(member_id):
         raise HTTPException(status_code=400, detail="Invalid member ID format")
     
+    # Convert string to UUID object
+    member_uuid = uuid.UUID(member_id)
+    
     # Get member
     member = db.query(models.Member).filter(
-        models.Member.id == member_id
+        models.Member.id == member_uuid
     ).first()
     
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
+    # Delete all associated check-ins first
+    checkins = db.query(models.Checkin).filter(
+        models.Checkin.member_id == member_uuid
+    ).all()
+    
+    for checkin in checkins:
+        db.delete(checkin)
+    
+    # Now delete the member
     db.delete(member)
     db.commit()
     
