@@ -343,13 +343,12 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
     
     result = []
     for checkin, member in checkins:
-        # Convert UTC timestamp to Toronto time
-        toronto_timestamp = checkin.timestamp.astimezone(toronto_tz)
+        # Send UTC timestamp (with 'Z' suffix) - let frontend handle timezone conversion
         result.append({
             "checkin_id": str(checkin.id),
             "email": member.email,
             "name": member.name,
-            "timestamp": toronto_timestamp.isoformat()
+            "timestamp": checkin.timestamp.isoformat() + 'Z'  # Ensure UTC format
         })
     
     return result
