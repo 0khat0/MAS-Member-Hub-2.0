@@ -89,7 +89,7 @@ function MemberStats({ memberId }: Props) {
           
           if (!response.ok) {
             if (response.status === 404) {
-              setError('Member not found. Please check in again.');
+              setError('Member not found. Please go back.');
               clearMemberData();
               return;
             }
@@ -167,7 +167,7 @@ function MemberStats({ memberId }: Props) {
       // In family mode, we'll fetch family members and then get stats for the selected member
       const memberEmail = localStorage.getItem('member_email');
       if (!memberEmail) {
-        setError('No family email found. Please check in again.');
+        setError('No family email found. Please go back.');
         setIsLoading(false);
         return;
       }
@@ -188,7 +188,7 @@ function MemberStats({ memberId }: Props) {
 
     // Validate memberId before making API call
     if (!isValidUUID(memberId)) {
-      setError('Invalid member ID. Please check in again.');
+      setError('Invalid member ID. Please go back.');
       setIsLoading(false);
       clearMemberData();
       return;
@@ -201,7 +201,7 @@ function MemberStats({ memberId }: Props) {
         
         if (!response.ok) {
           if (response.status === 404) {
-            setError('Member not found. Please check in again.');
+            setError('Member not found. Please go back.');
             clearMemberData();
           } else {
             setError('Failed to load profile. Please try again.');
@@ -530,7 +530,7 @@ function MemberStats({ memberId }: Props) {
           
           if (!response.ok) {
             if (response.status === 404) {
-              setError('Member not found. Please check in again.');
+              setError('Member not found. Please go back.');
               clearMemberData();
               return;
             }

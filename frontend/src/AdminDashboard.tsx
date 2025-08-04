@@ -370,7 +370,13 @@ function AdminDashboard() {
                                   disabled={isUpdatingMember}
                                 />
                               ) : (
-                                member.email
+                                <a 
+                                  href={`mailto:${member.email}`}
+                                  className="text-blue-400 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {member.email}
+                                </a>
                               )}
                             </td>
                             <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
@@ -427,7 +433,7 @@ function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <h2 className="text-xl font-semibold text-white mb-6">Today's Home Page</h2>
+          <h2 className="text-xl font-semibold text-white mb-6">Today's Check-ins</h2>
           <div className="overflow-x-auto">
             {todayCheckins.length === 0 ? (
               <div className="text-center py-8">
@@ -450,7 +456,15 @@ function AdminDashboard() {
                     >
                       <td className="py-3 px-4 text-white/90">{formatTime(checkin.timestamp)}</td>
                       <td className="py-3 px-4 text-white/90 font-medium">{checkin.name}</td>
-                      <td className="py-3 px-4 text-white/90">{checkin.email}</td>
+                      <td className="py-3 px-4 text-white/90">
+                        <a 
+                          href={`mailto:${checkin.email}`}
+                          className="text-blue-400 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {checkin.email}
+                        </a>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
