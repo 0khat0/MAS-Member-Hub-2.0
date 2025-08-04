@@ -272,13 +272,13 @@ function AdminDashboard() {
             />
           </div>
           <StatsCard
-            title="Home Page Today"
+            title="Check-ins Today"
             value={stats?.checkins_today}
             subtitle="Today's total"
             icon="📅"
           />
           <StatsCard
-            title="Total Home Page"
+            title="Total Check-ins"
             value={stats?.total_checkins}
             subtitle="All time"
             icon="🏆"
