@@ -57,7 +57,7 @@ const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
       <div className="mt-2 text-center">
         <p className="text-white/70 text-sm font-mono">{value}</p>
         <p className="text-white/50 text-xs mt-1">
-          Show this barcode to staff for check-in
+                      Show this barcode to staff for home page access
         </p>
       </div>
     </div>

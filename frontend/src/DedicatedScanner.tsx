@@ -86,9 +86,20 @@ function DedicatedScanner() {
           member: memberName,
           success: true
         }, ...prev.slice(0, 9)]); // Keep last 10 scans
+        
+        // Trigger real-time updates on other pages
+        if ((window as any).refreshAdminStats) {
+          (window as any).refreshAdminStats();
+        }
+        if ((window as any).refreshAdminCheckins) {
+          (window as any).refreshAdminCheckins();
+        }
+        if ((window as any).refreshMemberStats) {
+          (window as any).refreshMemberStats();
+        }
       } else {
         const errorData = await response.json();
-        setScanMessage(`❌ ${errorData.detail || 'Check-in failed'}`);
+        setScanMessage(`❌ ${errorData.detail || 'Home page access failed'}`);
         
         setScanHistory(prev => [{
           timestamp: new Date().toLocaleTimeString(),

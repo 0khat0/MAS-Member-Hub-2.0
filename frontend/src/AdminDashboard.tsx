@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { getTorontoTime } from './utils';
+import { getEasternTime } from './utils';
 
 interface DailyCheckin {
   checkin_id: string;
@@ -41,13 +41,28 @@ function AdminDashboard() {
     // Fetch today's check-ins
     fetchTodayCheckins();
     fetchStats();
+    
+    // Expose refresh functions globally for external access
+    (window as any).refreshAdminStats = fetchStats;
+    (window as any).refreshAdminCheckins = fetchTodayCheckins;
+    
+    // Set up periodic stats refresh
+    const statsInterval = setInterval(() => {
+      fetchStats();
+    }, 10000); // every 10 seconds
+    
+    return () => {
+      delete (window as any).refreshAdminStats;
+      delete (window as any).refreshAdminCheckins;
+      clearInterval(statsInterval);
+    };
   }, []);
 
   useEffect(() => {
     fetchTodayCheckins(); // initial fetch
     const interval = setInterval(() => {
       fetchTodayCheckins();
-    }, 3500); // every 3.5 seconds
+    }, 3000); // every 3 seconds for more responsive updates
     return () => clearInterval(interval); // cleanup on unmount
   }, []);
 
@@ -229,15 +244,15 @@ function AdminDashboard() {
           <div className="text-center">
             <p className="text-yellow-400 text-sm font-medium mb-2">🌍 Toronto Timezone Debug Info</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-white/70">
-              <div>
-                <span className="text-white/50">Date:</span> {getTorontoTime().toLocaleDateString('en-US', { timeZone: 'America/Toronto' })}
-              </div>
-              <div>
-                <span className="text-white/50">Day:</span> {getTorontoTime().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' })}
-              </div>
-              <div>
-                <span className="text-white/50">Time:</span> {getTorontoTime().toLocaleTimeString('en-US', { timeZone: 'America/Toronto' })}
-              </div>
+                              <div>
+                  <span className="text-white/50">Date:</span> {getEasternTime().toLocaleDateString('en-US', { timeZone: 'America/Toronto' })}
+                </div>
+                <div>
+                  <span className="text-white/50">Day:</span> {getEasternTime().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' })}
+                </div>
+                <div>
+                  <span className="text-white/50">Time:</span> {getEasternTime().toLocaleTimeString('en-US', { timeZone: 'America/Toronto' })}
+                </div>
             </div>
           </div>
         </motion.div>
@@ -257,13 +272,13 @@ function AdminDashboard() {
             />
           </div>
           <StatsCard
-            title="Check-ins Today"
+            title="Home Page Today"
             value={stats?.checkins_today}
             subtitle="Today's total"
             icon="📅"
           />
           <StatsCard
-            title="Total Check-ins"
+            title="Total Home Page"
             value={stats?.total_checkins}
             subtitle="All time"
             icon="🏆"
@@ -412,11 +427,11 @@ function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <h2 className="text-xl font-semibold text-white mb-6">Today's Check-ins</h2>
+          <h2 className="text-xl font-semibold text-white mb-6">Today's Home Page</h2>
           <div className="overflow-x-auto">
             {todayCheckins.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-white/70 text-lg">No check-ins yet today</p>
+                <p className="text-white/70 text-lg">No home page visits yet today</p>
               </div>
             ) : (
               <table className="w-full">

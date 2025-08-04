@@ -195,20 +195,20 @@ async def check_in(request: Request, member_data: dict, db: Session = Depends(ge
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    # Get Toronto time
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    # Get Eastern time
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     today = now.date()
     hour = now.hour
     is_am = hour < 12
 
     # Define AM/PM period start/end
     if is_am:
-        period_start = toronto_tz.localize(datetime.combine(today, time(0, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(11, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
     else:
-        period_start = toronto_tz.localize(datetime.combine(today, time(12, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(23, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
 
     # Convert to UTC for DB query
     period_start_utc = period_start.astimezone(pytz.UTC)
@@ -261,20 +261,20 @@ async def check_in_by_name(request: Request, member_data: dict, db: Session = De
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    # Get Toronto time
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    # Get Eastern time
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     today = now.date()
     hour = now.hour
     is_am = hour < 12
 
     # Define AM/PM period start/end
     if is_am:
-        period_start = toronto_tz.localize(datetime.combine(today, time(0, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(11, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
     else:
-        period_start = toronto_tz.localize(datetime.combine(today, time(12, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(23, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
 
     # Convert to UTC for DB query
     period_start_utc = period_start.astimezone(pytz.UTC)
@@ -363,11 +363,11 @@ async def get_checkins_by_range(
     group_by: str = "day",  # Options: day, week, month, year
     db: Session = Depends(get_db)
 ):
-    toronto_tz = pytz.timezone('America/Toronto')
+    eastern_tz = pytz.timezone('America/New_York')
     
     # Convert dates to datetime with timezone
-    start = toronto_tz.localize(datetime.combine(start_date, datetime.min.time()))
-    end = toronto_tz.localize(datetime.combine(end_date, datetime.max.time()))
+    start = eastern_tz.localize(datetime.combine(start_date, datetime.min.time()))
+    end = eastern_tz.localize(datetime.combine(end_date, datetime.max.time()))
     
     # Convert to UTC for query
     start_utc = start.astimezone(pytz.UTC)
@@ -382,9 +382,9 @@ async def get_checkins_by_range(
     # Add aggregation based on group_by parameter
     # Convert timestamps to Toronto timezone first, then truncate
     if group_by == "day":
-        # Group by day with count (convert to Toronto timezone first)
+        # Group by day with count (convert to Eastern timezone first)
         results = db.query(
-            func.date_trunc('day', func.timezone('America/Toronto', models.Checkin.timestamp)).label('date'),
+            func.date_trunc('day', func.timezone('America/New_York', models.Checkin.timestamp)).label('date'),
             func.count().label('count')
         ).filter(
             models.Checkin.timestamp >= start_utc,
@@ -392,7 +392,7 @@ async def get_checkins_by_range(
         ).group_by('date').order_by('date').all()
     elif group_by == "week":
         results = db.query(
-            func.date_trunc('week', func.timezone('America/Toronto', models.Checkin.timestamp)).label('date'),
+            func.date_trunc('week', func.timezone('America/New_York', models.Checkin.timestamp)).label('date'),
             func.count().label('count')
         ).filter(
             models.Checkin.timestamp >= start_utc,
@@ -400,7 +400,7 @@ async def get_checkins_by_range(
         ).group_by('date').order_by('date').all()
     elif group_by == "month":
         results = db.query(
-            func.date_trunc('month', func.timezone('America/Toronto', models.Checkin.timestamp)).label('date'),
+            func.date_trunc('month', func.timezone('America/New_York', models.Checkin.timestamp)).label('date'),
             func.count().label('count')
         ).filter(
             models.Checkin.timestamp >= start_utc,
@@ -408,7 +408,7 @@ async def get_checkins_by_range(
         ).group_by('date').order_by('date').all()
     elif group_by == "year":
         results = db.query(
-            func.date_trunc('year', func.timezone('America/Toronto', models.Checkin.timestamp)).label('date'),
+            func.date_trunc('year', func.timezone('America/New_York', models.Checkin.timestamp)).label('date'),
             func.count().label('count')
         ).filter(
             models.Checkin.timestamp >= start_utc,
@@ -416,18 +416,18 @@ async def get_checkins_by_range(
         ).group_by('date').order_by('date').all()
     
     return [{
-        "date": r.date.isoformat(),  # Already in Toronto timezone after func.timezone conversion
+        "date": r.date.isoformat(),  # Already in Eastern timezone after func.timezone conversion
         "count": r.count
     } for r in results]
 
 @app.get("/admin/checkins/stats")
 @limiter.limit("20/minute")
 async def get_checkin_stats(request: Request, db: Session = Depends(get_db)):
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     today = now.date()
-    start = toronto_tz.localize(datetime.combine(today, datetime.min.time()))
-    end = toronto_tz.localize(datetime.combine(today, datetime.max.time()))
+    start = eastern_tz.localize(datetime.combine(today, datetime.min.time()))
+    end = eastern_tz.localize(datetime.combine(today, datetime.max.time()))
     start_utc = start.astimezone(pytz.UTC)
     end_utc = end.astimezone(pytz.UTC)
     checkins_today_count = db.query(models.Checkin).filter(
@@ -623,20 +623,20 @@ async def family_checkin(request: Request, checkin_data: models.FamilyCheckin, d
     if not email or not member_names:
         raise HTTPException(status_code=400, detail="Email and member names are required")
     
-    # Get Toronto time for AM/PM logic
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    # Get Eastern time for AM/PM logic
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     today = now.date()
     hour = now.hour
     is_am = hour < 12
     
     # Define AM/PM period
     if is_am:
-        period_start = toronto_tz.localize(datetime.combine(today, time(0, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(11, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
     else:
-        period_start = toronto_tz.localize(datetime.combine(today, time(12, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(23, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
     
     # Convert to UTC for DB query
     period_start_utc = period_start.astimezone(pytz.UTC)
@@ -693,18 +693,18 @@ async def family_checkin_status(request: Request, email: str, db: Session = Depe
     if not members:
         raise HTTPException(status_code=404, detail="No family members found with this email")
 
-    # Get Toronto time and AM/PM period
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    # Get Eastern time and AM/PM period
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     today = now.date()
     hour = now.hour
     is_am = hour < 12
     if is_am:
-        period_start = toronto_tz.localize(datetime.combine(today, time(0, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(11, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
     else:
-        period_start = toronto_tz.localize(datetime.combine(today, time(12, 0, 0)))
-        period_end = toronto_tz.localize(datetime.combine(today, time(23, 59, 59)))
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
     period_start_utc = period_start.astimezone(pytz.UTC)
     period_end_utc = period_end.astimezone(pytz.UTC)
 
@@ -791,7 +791,7 @@ async def get_member_stats(request: Request, member_id: str, db: Session = Depen
         raise HTTPException(status_code=404, detail="Member not found")
     
     # Get timezone
-    tz = pytz.timezone('America/Toronto')
+    tz = pytz.timezone('America/New_York')
     
     # Calculate start of current month
     now = datetime.now(tz)
@@ -1065,9 +1065,9 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
     if not member:
         raise HTTPException(status_code=404, detail="Member not found with this barcode")
     
-    # Get timezone for Toronto
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
+    # Get timezone for Eastern
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day + timedelta(days=1)
     

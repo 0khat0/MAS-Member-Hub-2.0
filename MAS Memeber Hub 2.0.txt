@@ -1,0 +1,112 @@
+MAS Memeber Hub 2.0
+
+time fix for admin side.
+
+main.py
+
+'backend api endpoint"
+@app.get("/admin/checkins/today")
+@limiter.limit("30/minute")
+async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
+    # Get Toronto timezone
+    toronto_tz = pytz.timezone('America/Toronto')
+    
+    # Get today's date in Toronto
+    today = datetime.now(toronto_tz).date()
+    
+    # Create start and end times in Toronto
+    start = toronto_tz.localize(datetime.combine(today, datetime.min.time()))
+    end = toronto_tz.localize(datetime.combine(today, datetime.max.time()))
+    
+    # Convert to UTC for database query
+    start_utc = start.astimezone(pytz.UTC)
+    end_utc = end.astimezone(pytz.UTC)
+    
+    # Use optimized query with joins, order by timestamp descending
+    checkins = db.query(models.Checkin, models.Member).join(
+        models.Member, models.Checkin.member_id == models.Member.id
+    ).filter(
+        models.Checkin.timestamp >= start_utc,
+        models.Checkin.timestamp <= end_utc
+    ).order_by(models.Checkin.timestamp.desc()).all()
+    
+    result = []
+    for checkin, member in checkins:
+        # Convert UTC timestamp to Toronto time
+        toronto_timestamp = checkin.timestamp.astimezone(toronto_tz)
+        result.append({
+            "checkin_id": str(checkin.id),
+            "email": member.email,
+            "name": member.name,
+            "timestamp": toronto_timestamp.isoformat()
+        })
+    
+    return result
+
+
+admindashboard.tsx
+
+'frontend time display'
+const formatTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/Toronto'
+  });
+};
+
+
+'frontend table rendering'
+{/* Today's Check-ins Table */}
+<motion.div 
+  className="glass-card p-6 mb-8"
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, delay: 0.2 }}
+>
+  <h2 className="text-xl font-semibold text-white mb-6">Today's Check-ins</h2>
+  <div className="overflow-x-auto">
+    {todayCheckins.length === 0 ? (
+      <div className="text-center py-8">
+        <p className="text-white/70 text-lg">No check-ins yet today</p>
+      </div>
+    ) : (
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-white/10">
+            <th className="text-left py-3 px-4 text-white/70 font-medium">Time</th>
+            <th className="text-left py-3 px-4 text-white/70 font-medium">Name</th>
+            <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {todayCheckins.map((checkin) => (
+            <tr 
+              key={checkin.checkin_id}
+              className="border-b border-white/5 hover:bg-white/5 transition-colors"
+            >
+              <td className="py-3 px-4 text-white/90">{formatTime(checkin.timestamp)}</td>
+              <td className="py-3 px-4 text-white/90 font-medium">{checkin.name}</td>
+              <td className="py-3 px-4 text-white/90">{checkin.email}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</motion.div>
+
+
+'data fetching'
+const fetchTodayCheckins = async () => {
+  try {
+    const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+    const response = await fetch(`${API_URL}/admin/checkins/today`);
+    const data = await response.json();
+    setTodayCheckins(data);
+  } catch (error) {
+    console.error('Error fetching today\'s check-ins:', error);
+  }
+};

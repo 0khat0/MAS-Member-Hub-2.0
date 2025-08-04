@@ -9,15 +9,15 @@ export function getApiUrl(): string {
 }
 
 // Toronto timezone utilities
-export function getTorontoTime(): Date {
+export function getEasternTime(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "America/Toronto" }));
 }
 
-export function getTorontoDateString(date: Date = new Date()): string {
+export function getEasternDateString(date: Date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "America/Toronto" }); // Returns YYYY-MM-DD
 }
 
-export function getTorontoDateTimeString(date: Date = new Date()): string {
+export function getEasternDateTimeString(date: Date = new Date()): string {
   return date.toLocaleString("en-US", { 
     timeZone: "America/Toronto",
     year: 'numeric',
@@ -30,14 +30,14 @@ export function getTorontoDateTimeString(date: Date = new Date()): string {
   });
 }
 
-export function getTorontoDayOfWeek(date: Date = new Date()): string {
+export function getEasternDayOfWeek(date: Date = new Date()): string {
   return date.toLocaleDateString("en-US", { 
     timeZone: "America/Toronto",
     weekday: 'long'
   });
 }
 
-export function getMondayOfCurrentWeekToronto(date: Date = new Date()): Date {
+export function getMondayOfCurrentWeekEastern(date: Date = new Date()): Date {
   const torontoDate = new Date(date.toLocaleString("en-US", { timeZone: "America/Toronto" }));
   const day = torontoDate.getDay();
   const diff = torontoDate.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
@@ -46,9 +46,9 @@ export function getMondayOfCurrentWeekToronto(date: Date = new Date()): Date {
   return monday;
 }
 
-export function isSameDayToronto(date1: Date, date2: Date): boolean {
-  const torontoDate1 = getTorontoDateString(date1);
-  const torontoDate2 = getTorontoDateString(date2);
+export function isSameDayEastern(date1: Date, date2: Date): boolean {
+  const torontoDate1 = getEasternDateString(date1);
+  const torontoDate2 = getEasternDateString(date2);
   return torontoDate1 === torontoDate2;
 }
 

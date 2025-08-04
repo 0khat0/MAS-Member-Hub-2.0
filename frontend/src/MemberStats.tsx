@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { isValidUUID, getApiUrl, clearMemberData, getTorontoTime, getTorontoDateString, getTorontoDateTimeString, getMondayOfCurrentWeekToronto } from './utils';
+import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
 
 interface MemberStats {
@@ -77,6 +77,89 @@ function MemberStats({ memberId }: Props) {
     }
   }, []); // Empty dependency array - runs only on mount
 
+  // Expose refresh function globally for external access
+  useEffect(() => {
+    const refreshStats = async () => {
+      if (memberId === 'family' && selectedMemberId) {
+        // Re-fetch stats for selected family member
+        try {
+          setIsLoading(true);
+          const API_URL = getApiUrl();
+          const response = await fetch(`${API_URL}/member/${selectedMemberId}/stats`);
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              setError('Member not found. Please check in again.');
+              clearMemberData();
+              return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          setStats(data);
+          setError(null);
+
+          // Calculate weekly check-ins for the selected member
+          if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
+            const now = getEasternTime();
+            const monday = getMondayOfCurrentWeekEastern(now);
+            
+            const mondayString = getEasternDateString(monday);
+            const todayString = getEasternDateString(now);
+            
+            const weekCheckins = data.check_in_dates.filter((d: string) => {
+              const checkinDateString = d.split('T')[0];
+              return checkinDateString >= mondayString && checkinDateString <= todayString;
+            }).length;
+            setWeeklyCheckins(weekCheckins);
+          } else {
+            setWeeklyCheckins(0);
+          }
+        } catch (error) {
+          console.error('Error refreshing selected member stats:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (memberId && isValidUUID(memberId)) {
+        // Re-fetch stats for individual member
+        try {
+          const API_URL = getApiUrl();
+          const response = await fetch(`${API_URL}/member/${memberId}/stats`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            setStats(data);
+            setEditName(data.name || '');
+            setEditEmail(data.email || '');
+            if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
+              const now = getEasternTime();
+              const monday = getMondayOfCurrentWeekEastern(now);
+              
+              const mondayString = getEasternDateString(monday);
+              const todayString = getEasternDateString(now);
+              
+              const weekCheckins = data.check_in_dates.filter((d: string) => {
+                const checkinDateString = d.split('T')[0];
+                return checkinDateString >= mondayString && checkinDateString <= todayString;
+              }).length;
+              setWeeklyCheckins(weekCheckins);
+            } else {
+              setWeeklyCheckins(0);
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing stats:', error);
+        }
+      }
+    };
+
+    (window as any).refreshMemberStats = refreshStats;
+    return () => {
+      delete (window as any).refreshMemberStats;
+    };
+  }, [memberId, selectedMemberId]);
+
   useEffect(() => {
     // Handle family mode
     if (memberId === 'family') {
@@ -133,11 +216,11 @@ function MemberStats({ memberId }: Props) {
         setEditName(data.name || '');
         setEditEmail(data.email || '');
         if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
-          const now = getTorontoTime();
-          const monday = getMondayOfCurrentWeekToronto(now);
+          const now = getEasternTime();
+          const monday = getMondayOfCurrentWeekEastern(now);
           
-          const mondayString = getTorontoDateString(monday);
-          const todayString = getTorontoDateString(now);
+          const mondayString = getEasternDateString(monday);
+          const todayString = getEasternDateString(now);
           
           const weekCheckins = data.check_in_dates.filter((d: string) => {
             const checkinDateString = d.split('T')[0]; // Get just the date part from ISO string
@@ -237,11 +320,11 @@ function MemberStats({ memberId }: Props) {
         setEditEmail(data.email || '');
         
         if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
-          const now = getTorontoTime();
-          const monday = getMondayOfCurrentWeekToronto(now);
+          const now = getEasternTime();
+          const monday = getMondayOfCurrentWeekEastern(now);
           
-          const mondayString = getTorontoDateString(monday);
-          const todayString = getTorontoDateString(now);
+          const mondayString = getEasternDateString(monday);
+          const todayString = getEasternDateString(now);
           
           const weekCheckins = data.check_in_dates.filter((d: string) => {
             const checkinDateString = d.split('T')[0];
@@ -460,11 +543,11 @@ function MemberStats({ memberId }: Props) {
 
           // Calculate weekly check-ins for the selected member
           if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
-            const now = getTorontoTime();
-            const monday = getMondayOfCurrentWeekToronto(now);
+            const now = getEasternTime();
+            const monday = getMondayOfCurrentWeekEastern(now);
             
-            const mondayString = getTorontoDateString(monday);
-            const todayString = getTorontoDateString(now);
+            const mondayString = getEasternDateString(monday);
+            const todayString = getEasternDateString(now);
             
             const weekCheckins = data.check_in_dates.filter((d: string) => {
               const checkinDateString = d.split('T')[0]; // Get just the date part from ISO string
@@ -502,10 +585,10 @@ function MemberStats({ memberId }: Props) {
           <h2 className="text-xl font-semibold text-white mb-2">Profile Error</h2>
           <p className="text-white/70 mb-4">{error}</p>
           <button
-            onClick={() => window.location.href = '/checkin'}
+            onClick={() => window.location.href = '/home'}
             className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors duration-200"
           >
-            Go to Check-In
+            Go Back Home
           </button>
         </div>
       </div>
@@ -782,14 +865,14 @@ function MemberStats({ memberId }: Props) {
                 </button>
               </div>
             </div>
-            {/* Monthly Check-ins Card */}
+            {/* Monthly Home Page Card */}
             <div className="bg-[#232736] border border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-3xl text-blue-400">📅</span>
                 <span className="text-lg font-bold text-white">This Month</span>
               </div>
               <div className="text-4xl font-extrabold text-white mb-1">{stats.monthly_check_ins}</div>
-              <div className="text-sm text-white/70">Check-ins</div>
+                              <div className="text-sm text-white/70">Home Page</div>
             </div>
           </div>
         </div>

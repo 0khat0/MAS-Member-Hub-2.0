@@ -60,9 +60,9 @@ function AppContent() {
   // Get validated memberId from localStorage for profile
   const memberId = getMemberId();
 
-  // If user is logged in and tries to access check-in page, redirect to profile
+  // If user is logged in and tries to access home page, redirect to profile
   useEffect(() => {
-    if (memberId && (location.pathname === "/checkin" || location.pathname === "/")) {
+    if (memberId && (location.pathname === "/home" || location.pathname === "/")) {
       window.location.href = `/profile?id=${memberId}`;
     }
   }, [memberId, location.pathname]);
@@ -77,7 +77,7 @@ function AppContent() {
           <ErrorBoundary>
             <AnimatePresence mode="wait">
               <Routes location={location} key={location.pathname}>
-                <Route path="/checkin" element={
+                <Route path="/home" element={
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}

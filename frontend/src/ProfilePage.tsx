@@ -39,7 +39,7 @@ function ProfilePage() {
       setMemberIdState(urlMemberId);
       setIsLoading(false);
       
-      // Replace browser history to prevent going back to check-in page
+      // Replace browser history to prevent going back to home page
       window.history.replaceState(null, '', `/profile?id=${urlMemberId}`);
     } else {
       // Otherwise, check localStorage
@@ -47,7 +47,7 @@ function ProfilePage() {
       setMemberIdState(localMemberId);
       setIsLoading(false);
       
-      // Replace browser history to prevent going back to check-in page
+      // Replace browser history to prevent going back to home page
       if (localMemberId) {
         window.history.replaceState(null, '', `/profile?id=${localMemberId}`);
       }
@@ -69,11 +69,11 @@ function ProfilePage() {
           <div className="text-red-500 text-xl mb-4">⚠️</div>
           <h2 className="text-xl font-semibold text-white mb-2">No Profile Found</h2>
           <p className="text-white/70 mb-4">Please register or check in first.</p>
-          <a
-            href="/checkin"
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors duration-200"
-          >
-            Go to Check-In
+                     <a
+             href="/home"
+             className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors duration-200"
+           >
+                         Go Back Home
           </a>
         </div>
       </div>
@@ -82,9 +82,9 @@ function ProfilePage() {
 
   const handleLogout = () => {
     clearMemberData();
-    // Clear browser history and redirect to check-in
-    window.history.replaceState(null, '', '/checkin');
-    window.location.href = '/checkin';
+    // Clear browser history and redirect to home
+    window.history.replaceState(null, '', '/home');
+    window.location.href = '/home';
   };
 
   const handleReportIssue = () => {

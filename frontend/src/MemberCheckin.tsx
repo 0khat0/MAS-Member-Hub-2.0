@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "./assets/mas-logo.png";
-import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getTorontoTime } from "./utils";
+import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime } from "./utils";
 
 function getDailyMuayThaiMessage() {
   const messages = [
@@ -21,8 +21,8 @@ function getDailyMuayThaiMessage() {
     "You are your only competition!",
     "Make every session count!"
   ];
-  // Use the day of the year to pick a message (Toronto time)
-  const now = getTorontoTime();
+  // Use the day of the year to pick a message (Eastern time)
+  const now = getEasternTime();
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = now.getTime() - start.getTime();
   const oneDay = 1000 * 60 * 60 * 24;
@@ -166,7 +166,7 @@ function MemberCheckin() {
           >
             <div className="glass-card space-y-6 p-6">
               <div className="text-center">
-                <h3 className="text-xl font-semibold text-white mb-2">👨‍👩‍👧‍👦 Family Check-in</h3>
+                <h3 className="text-xl font-semibold text-white mb-2">👨‍👩‍👧‍👦 Family Home Page</h3>
                 <p className="text-white/70 mb-4">Select which family members are here today:</p>
               </div>
               <div className="space-y-3">
@@ -195,7 +195,7 @@ function MemberCheckin() {
                     } else {
                       const err = await res.json();
                       setStatus("error");
-                      setMessage(err.detail || "Family check-in failed.");
+                      setMessage(err.detail || "Family home page access failed.");
                     }
                   } catch {
                     setStatus("error");
@@ -205,7 +205,7 @@ function MemberCheckin() {
                 disabled={selectedFamilyMembers.length === 0}
                 className="w-full bg-gradient-to-r from-red-700 via-red-500 to-pink-500 text-white py-3 px-6 rounded-lg font-semibold hover:from-pink-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-black/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Check In Selected Members ({selectedFamilyMembers.length})
+                Access Home Page for Selected Members ({selectedFamilyMembers.length})
               </button>
             </div>
           </motion.div>
