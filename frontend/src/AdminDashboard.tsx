@@ -33,10 +33,7 @@ function AdminDashboard() {
   const [editEmail, setEditEmail] = useState("");
   const [isUpdatingMember, setIsUpdatingMember] = useState(false);
 
-  // Scanner functionality
-  const [scannerInput, setScannerInput] = useState("");
-  const [isProcessingScan, setIsProcessingScan] = useState(false);
-  const [scanMessage, setScanMessage] = useState("");
+
 
   // Authentication check removed - admin access is now open
 
@@ -186,91 +183,7 @@ function AdminDashboard() {
     setEditEmail("");
   };
 
-  // Scanner functions
-  const handleScannerInput = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scannerInput.trim() || isProcessingScan) return;
 
-    const barcode = scannerInput.trim();
-    
-    // Validate barcode format (basic check)
-    if (barcode.length < 3) {
-      console.log('🔍 Scanner: Barcode too short, ignoring:', barcode);
-      setScannerInput("");
-      return;
-    }
-    
-    console.log('🔍 Scanner: Processing barcode:', barcode);
-    
-    setIsProcessingScan(true);
-    setScanMessage("Processing scan...");
-
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-      
-      // Validate API URL
-      if (!API_URL) {
-        throw new Error('API URL not configured');
-      }
-      
-      console.log('🔍 Scanner: Making request to:', `${API_URL}/checkin-by-barcode`);
-      
-      // Direct check-in by barcode
-      const checkinResponse = await fetch(`${API_URL}/checkin-by-barcode`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({ barcode }),
-      });
-      
-      console.log('🔍 Scanner: Response status:', checkinResponse.status);
-      
-      if (checkinResponse.ok) {
-        const result = await checkinResponse.json();
-        console.log('🔍 Scanner: Success response:', result);
-        
-        if (result.family_checkin) {
-          setScanMessage(`✅ Family check-in successful! ${result.member_count} members checked in.`);
-        } else {
-          setScanMessage(`✅ ${result.member_name} checked in successfully!`);
-        }
-        setScannerInput("");
-        fetchTodayCheckins(); // Refresh the check-ins list
-      } else {
-        console.log('🔍 Scanner: Error response status:', checkinResponse.status);
-        let errorMessage = "Check-in failed. Please try again.";
-        
-        try {
-          const errorData = await checkinResponse.json();
-          errorMessage = errorData.detail || errorMessage;
-          console.log('🔍 Scanner: Error data:', errorData);
-        } catch (parseError) {
-          console.log('🔍 Scanner: Could not parse error response');
-        }
-        
-        setScanMessage(`❌ ${errorMessage}`);
-        // Don't clear input on error so user can try again
-      }
-    } catch (error) {
-      console.error('🔍 Scanner: Network error:', error);
-      setScanMessage("❌ Network error. Please check your connection and try again.");
-      // Don't clear input on error so user can try again
-    } finally {
-      setIsProcessingScan(false);
-      // Clear message after 5 seconds
-      setTimeout(() => setScanMessage(""), 5000);
-      
-      // Refocus input after processing (both success and error)
-      setTimeout(() => {
-        const input = document.getElementById('scanner-input') as HTMLInputElement;
-        if (input) {
-          input.focus();
-        }
-      }, 100);
-    }
-  };
 
   // Login handler removed - admin access is now open
 
@@ -290,106 +203,20 @@ function AdminDashboard() {
           MAS Academy Member Hub - Admin Dashboard
         </motion.h1>
 
-        {/* Hidden Scanner Input - Always Listening */}
-        <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden">
-          <input
-            type="text"
-            value=""
-            onChange={(e) => {
-              // Only process if we have input and not currently processing
-              const target = e.target as HTMLInputElement;
-              if (target.value.trim() && !isProcessingScan) {
-                console.log('🔍 Hidden Scanner: Processing barcode:', target.value);
-                setScannerInput(target.value);
-                handleScannerInput({ preventDefault: () => {} } as any);
-                target.value = ''; // Clear the hidden input
-              }
-            }}
-            onKeyDown={(e) => {
-              const target = e.target as HTMLInputElement;
-              if (e.key === 'Enter' && target.value.trim() && !isProcessingScan) {
-                e.preventDefault();
-                console.log('🔍 Hidden Scanner: Processing barcode on Enter:', target.value);
-                setScannerInput(target.value);
-                handleScannerInput({ preventDefault: () => {} } as any);
-                target.value = ''; // Clear the hidden input
-              }
-            }}
-            className="opacity-0 absolute -top-100"
-            autoFocus
-            placeholder=""
-          />
-        </div>
-
-        {/* Simple Scanner Input */}
-        <div className="mb-6">
-          <div className="max-w-md mx-auto">
-            <label htmlFor="scanner-input" className="block text-sm font-medium text-white/70 mb-2">
-              QR Code Scanner
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="scanner-input"
-                type="text"
-                value={scannerInput}
-                onChange={(e) => setScannerInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && scannerInput.trim() && !isProcessingScan) {
-                    e.preventDefault();
-                    handleScannerInput(e);
-                  }
-                }}
-                placeholder="Scan QR code or enter barcode..."
-                className="flex-1 px-4 py-2 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-                disabled={isProcessingScan}
-              />
-              <button
-                onClick={(e) => handleScannerInput(e)}
-                disabled={!scannerInput.trim() || isProcessingScan}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-              >
-                {isProcessingScan ? "Processing..." : "Check In"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-
-        {/* Scanner Status Message */}
-        {scanMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`fixed top-4 right-4 p-4 rounded-lg text-sm font-medium z-50 ${
-              scanMessage.includes("✅") 
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : scanMessage.includes("❌")
-                ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-            }`}
-          >
-            {scanMessage}
-          </motion.div>
-        )}
-
-        {/* Scanner Ready Indicator */}
-        <motion.div
-          className={`fixed bottom-4 right-4 p-3 rounded-full z-50 ${
-            isProcessingScan 
-              ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-              : "bg-green-500/20 text-green-400 border border-green-500/30"
-          }`}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
+        {/* Scanner Navigation */}
+        <motion.div 
+          className="text-center mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              isProcessingScan ? "bg-yellow-400 animate-pulse" : "bg-green-400"
-            }`}></div>
-            <span className="text-xs font-medium">
-              {isProcessingScan ? "Processing..." : "Scanner Always Listening"}
-            </span>
-          </div>
+          <a 
+            href="/admin/scanner" 
+            className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+          >
+            <span>🔍</span>
+            <span>Open QR Scanner</span>
+          </a>
         </motion.div>
 
         {/* Debug Timezone Info */}

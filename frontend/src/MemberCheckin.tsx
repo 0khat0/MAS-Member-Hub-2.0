@@ -32,7 +32,7 @@ function getDailyMuayThaiMessage() {
 
 function MemberCheckin() {
   const [memberEmail, setMemberEmail] = useState<string | null>(null);
-  const [status, setStatus] = useState<"loading" | "register" | "checking-in" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "register" | "signin" | "success" | "error">("loading");
   const [message, setMessage] = useState<string>("");
   const [formEmail, setFormEmail] = useState("");
   const [formName, setFormName] = useState("");
@@ -52,109 +52,56 @@ function MemberCheckin() {
   const addFamilyMember = () => setFamilyNames(names => [...names, ""]);
   const removeFamilyMember = (idx: number) => setFamilyNames(names => names.filter((_, i) => i !== idx));
 
-  // Helper to fetch family check-in status
-  const fetchFamilyCheckinStatus = async (email: string) => {
-    setCheckinStatusLoading(true);
-    try {
-      const API_URL = getApiUrl();
-      const res = await fetch(`${API_URL}/family/checkin-status/${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setNotCheckedInMembers(data.not_checked_in || []);
-      } else {
-        setNotCheckedInMembers([]);
+
+
+      // On load, check if user is already logged in
+    useEffect(() => {
+      const savedEmail = localStorage.getItem("member_email");
+      const savedMemberId = localStorage.getItem("member_id");
+      const savedFamilyMembers = localStorage.getItem("family_members");
+
+      // Validate saved member_id if it exists
+      if (savedMemberId && !isValidUUID(savedMemberId)) {
+        localStorage.removeItem("member_id");
       }
-    } catch {
-      setNotCheckedInMembers([]);
-    } finally {
-      setCheckinStatusLoading(false);
-    }
-  };
 
-  // On load, if family, fetch check-in status
-  useEffect(() => {
-    const savedEmail = localStorage.getItem("member_email");
-    const savedMemberId = localStorage.getItem("member_id");
-    const savedFamilyMembers = localStorage.getItem("family_members");
+      if (savedEmail) {
+        setMemberEmail(savedEmail);
 
-    // Validate saved member_id if it exists
-    if (savedMemberId && !isValidUUID(savedMemberId)) {
-      localStorage.removeItem("member_id");
-    }
-
-    if (savedEmail) {
-      setMemberEmail(savedEmail);
-
-      // Check if this is a family
-      if (savedFamilyMembers) {
-        try {
-          const members = JSON.parse(savedFamilyMembers);
-          setFamilyMembers(members);
-          if (members.length > 1) {
-            // Always fetch check-in status for family
-            fetchFamilyCheckinStatus(savedEmail).then(() => {
-              // The notCheckedInMembers state will be set by fetchFamilyCheckinStatus
-            });
-            setStatus("register");
-            setMessage("Select which family members are here today:");
-            return;
+        // Check if this is a family
+        if (savedFamilyMembers) {
+          try {
+            const members = JSON.parse(savedFamilyMembers);
+            setFamilyMembers(members);
+            if (members.length > 1) {
+              // Family - just redirect to profile
+              setStatus("success");
+              setMessage("Welcome back! Redirecting to your family profile...");
+              setTimeout(() => {
+                window.location.href = `/profile?email=${encodeURIComponent(savedEmail)}`;
+              }, 1500);
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing family members:", e);
+            localStorage.removeItem("family_members");
           }
-        } catch (e) {
-          console.error("Error parsing family members:", e);
-          localStorage.removeItem("family_members");
         }
+
+        // Single member - just redirect to profile
+        setStatus("success");
+        setMessage("Welcome back! Redirecting to your profile...");
+        setTimeout(() => {
+          window.location.href = `/profile?email=${encodeURIComponent(savedEmail)}`;
+        }, 1500);
+      } else {
+        setStatus("register");
       }
+    }, []);
 
-      // Single member or family with only one member - proceed with auto check-in
-      setStatus("checking-in");
-    } else {
-      setStatus("register");
-    }
-  }, []);
 
-  // After successful family check-in or registration, refresh check-in status
-  useEffect(() => {
-    if (status === "success" && memberEmail && familyMembers.length > 1) {
-      fetchFamilyCheckinStatus(memberEmail);
-    }
-  }, [status]);
 
-  useEffect(() => {
-    if (status === "checking-in" && memberEmail) {
-      const API_URL = getApiUrl();
-      fetch(`${API_URL}/checkin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: memberEmail }),
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            // Only store member_id if it's a valid UUID
-            if (data.member_id && isValidUUID(data.member_id)) {
-              setMemberId(data.member_id);
-              console.log('Set member_id after check-in (useEffect):', data.member_id);
-            }
-            setStatus("success");
-            setMessage("Check-in successful! Welcome back.");
-          } else {
-            const data = await res.json();
-            if (data.detail === "Member not found") {
-              clearMemberData();
-              setStatus("register");
-              setMessage("");
-            } else {
-              setStatus("error");
-              setMessage(data.detail || "Check-in failed.");
-            }
-          }
-        })
-        .catch(() => {
-          setStatus("error");
-          setMessage("Network error. Please try again.");
-        });
-    }
-  }, [status, memberEmail]);
+
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-black via-gray-900 to-red-950 font-poppins relative overflow-hidden">
@@ -208,39 +155,8 @@ function MemberCheckin() {
             <div className="h-2 rounded-full animated-accent-bar shadow-md mt-2 w-full" />
           </div>
         </motion.div>
-        {/* SUCCESS STATE: All family members checked in - ONLY show green message for family */}
-        {status === "success" && familyMembers.length > 1 && (
-          <motion.div
-            className="w-full max-w-md"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="glass-card bg-gradient-to-r from-green-800 via-green-700 to-green-600 p-6 text-center">
-              <p className="text-xl font-semibold text-white">✓ All family members have checked in for this period!</p>
-              <p className="mt-2 text-lg text-white/90 font-medium">{getDailyMuayThaiMessage()}</p>
-            </div>
-          </motion.div>
-        )}
-        {/* SUCCESS STATE: All family members already checked in - persistent green message */}
-        {status === "register" && familyMembers.length > 1 && notCheckedInMembers.length === 0 && !checkinStatusLoading && (
-          <motion.div
-            className="w-full max-w-md"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="glass-card bg-gradient-to-r from-green-800 via-green-700 to-green-600 p-6 text-center">
-              <p className="text-xl font-semibold text-white">✓ All family members have checked in for this period!</p>
-              <p className="mt-2 text-lg text-white/90 font-medium">{getDailyMuayThaiMessage()}</p>
-            </div>
-          </motion.div>
-        )}
-        {/* SUCCESS STATE: Single user after check-in - ONLY show green message for single */}
-        {/* Success message removed - users are redirected to profile instead */}
-
-        {/* FAMILY SELECTION STATE: Some family members not checked in - ONLY show family selection */}
-        {status === "register" && familyMembers.length > 1 && notCheckedInMembers.length > 0 && !checkinStatusLoading && (
+        {/* FAMILY PROFILE ACCESS */}
+        {status === "register" && familyMembers.length > 1 && (
           <motion.div
             className="w-full max-w-md space-y-6"
             initial={{ opacity: 0, y: 20 }}
@@ -254,22 +170,10 @@ function MemberCheckin() {
                 <p className="text-white/70 mb-4">Select which family members are here today:</p>
               </div>
               <div className="space-y-3">
-                {notCheckedInMembers.map((memberName) => (
-                  <label key={memberName} className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-white/5 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={selectedFamilyMembers.includes(memberName)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedFamilyMembers(prev => [...prev, memberName]);
-                        } else {
-                          setSelectedFamilyMembers(prev => prev.filter(name => name !== memberName));
-                        }
-                      }}
-                      className="w-5 h-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500 focus:ring-2"
-                    />
+                {familyMembers.map((memberName) => (
+                  <div key={memberName} className="flex items-center space-x-3 p-3 rounded-lg bg-white/5">
                     <span className="text-white font-medium">{memberName}</span>
-                  </label>
+                  </div>
                 ))}
               </div>
               <button
@@ -287,8 +191,6 @@ function MemberCheckin() {
 
                     if (res.ok) {
                       await res.json(); // Remove unused variable
-                      // Refresh check-in status after check-in
-                      await fetchFamilyCheckinStatus(memberEmail!);
                       setSelectedFamilyMembers([]);
                     } else {
                       const err = await res.json();
@@ -559,47 +461,15 @@ function MemberCheckin() {
                           setFamilyMembers(familyMemberNames);
                         console.log("✅ localStorage updated");
                         
-                        // STEP 4: Check in all entered members using family check-in
-                        // Only check in members that actually exist in the family now
-                        const membersToCheckIn = allNames.filter(name => 
-                           familyMemberNames.some((familyName: string) => 
-                             familyName.toLowerCase().trim() === name.toLowerCase().trim()
-                           )
-                         );
-                        
-                        console.log("🔍 STEP 4: Checking in members...");
-                        console.log("- All entered names:", allNames);
-                        console.log("- Family member names:", familyMemberNames);
-                        console.log("- Members to check in:", membersToCheckIn);
-                        
-                        const familyCheckinRes = await fetch(`${API_URL}/family/checkin`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            email: familyEmail,
-                            member_names: membersToCheckIn,
-                          }),
-                    });
-                    
-                        if (familyCheckinRes.ok) {
-                          const checkinResult = await familyCheckinRes.json();
-                          console.log("✅ Check-in successful:", checkinResult);
-                          
-                          // For sign-in flow, redirect to profile after successful check-in
-                          if (familyMemberNames.length > 1) {
-                            // Family - redirect to family profile using email
-                            window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
-                            return;
-                          } else {
-                            // Single member - redirect to profile
-                            window.location.href = `/profile?id=${existingMembers[0].id}`;
-                            return;
-                          }
+                        // For registration flow, just redirect to profile (no check-in)
+                        if (familyMemberNames.length > 1) {
+                          // Family - redirect to family profile using email
+                          window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
+                          return;
                         } else {
-                          const err = await familyCheckinRes.json();
-                          console.error("❌ Check-in failed:", err);
-                          setStatus("error");
-                          setMessage(err.detail || "Check-in failed.");
+                          // Single member - redirect to profile
+                          window.location.href = `/profile?id=${existingMembers[0].id}`;
+                          return;
                         }
                     } else {
                         console.error("❌ Failed to load family information");
@@ -834,48 +704,16 @@ function MemberCheckin() {
                         setFamilyMembers(familyMemberNames);
                         console.log("✅ localStorage updated");
                         
-                        // STEP 4: Check in all entered members using family check-in
-                        // Only check in members that actually exist in the family now
-                        const membersToCheckIn = allNames.filter(name => 
-                           familyMemberNames.some((familyName: string) => 
-                             familyName.toLowerCase().trim() === name.toLowerCase().trim()
-                           )
-                         );
-                        
-                        console.log("🔍 STEP 4: Checking in members...");
-                        console.log("- All entered names:", allNames);
-                        console.log("- Family member names:", familyMemberNames);
-                        console.log("- Members to check in:", membersToCheckIn);
-                        
-                        const familyCheckinRes = await fetch(`${API_URL}/family/checkin`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            email: familyEmail,
-                            member_names: membersToCheckIn,
-                          }),
-                        });
-                        
-                        if (familyCheckinRes.ok) {
-                          const checkinResult = await familyCheckinRes.json();
-                          console.log("✅ Check-in successful:", checkinResult);
-                          
-                          // For sign-in flow, redirect to profile after successful check-in
-                          if (familyMemberNames.length > 1) {
-                            // Family - redirect to family profile using email
-                            window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
-                            return;
-                          } else {
-                            // Single member - redirect to profile
-                            window.location.href = `/profile?id=${existingMembers[0].id}`;
-                            return;
-                          }
+                        // For sign-in flow, just redirect to profile (no check-in)
+                        if (familyMemberNames.length > 1) {
+                          // Family - redirect to family profile using email
+                          window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
+                          return;
                         } else {
-                          const err = await familyCheckinRes.json();
-                          console.error("❌ Check-in failed:", err);
-                          setStatus("error");
-                          setMessage(err.detail || "Check-in failed.");
-                    }
+                          // Single member - redirect to profile
+                          window.location.href = `/profile?id=${existingMembers[0].id}`;
+                          return;
+                        }
                       } else {
                         console.error("❌ Failed to load family information");
                         setStatus("error");
@@ -947,7 +785,7 @@ function MemberCheckin() {
 
         {/* Loading and Error States */}
         <AnimatePresence>
-          {(status === "checking-in" || status === "loading" || status === "error") && (
+          {(status === "loading" || status === "error") && (
             <motion.div 
               className="w-full max-w-md space-y-4"
               initial={{ opacity: 0, y: 20 }}
@@ -955,7 +793,7 @@ function MemberCheckin() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {(status === "checking-in" || status === "loading") && (
+              {status === "loading" && (
                 <motion.div 
                   className="glass-card flex flex-col items-center p-6"
                   animate={{ scale: [1, 1.02, 1] }}
@@ -963,7 +801,7 @@ function MemberCheckin() {
                 >
                   <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-red-500 mb-4"></div>
                   <p className="text-xl font-medium text-white/90">
-                    {status === "checking-in" ? "Checking you in..." : "Processing..."}
+                    {"Processing..."}
                   </p>
                 </motion.div>
               )}

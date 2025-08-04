@@ -10,6 +10,7 @@ import { getMemberId, reportIssue } from "./utils";
 // Lazy load components for better performance
 const MemberCheckin = lazy(() => import("./MemberCheckin"));
 const AdminDashboard = lazy(() => import("./AdminDashboard"));
+const DedicatedScanner = lazy(() => import("./DedicatedScanner"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -105,6 +106,16 @@ function AppContent() {
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
                     <AdminDashboard />
+                  </motion.div>
+                } />
+                <Route path="/admin/scanner" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <DedicatedScanner />
                   </motion.div>
                 } />
                 <Route path="/" element={
