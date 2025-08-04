@@ -92,6 +92,53 @@ function ProfilePage() {
     setShowToolMenu(false);
   };
 
+  const handleDeleteAccount = async () => {
+    if (!memberId || memberId === 'family') {
+      alert('Cannot delete account in family mode');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your data.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      console.log('Attempting to delete account:', memberId);
+      console.log('API URL:', API_URL);
+      
+      const response = await fetch(`${API_URL}/member/${memberId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (response.ok) {
+        // Clear all data and redirect to home
+        clearMemberData();
+        window.history.replaceState(null, '', '/home');
+        window.location.href = '/home';
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('Delete account error:', errorData);
+        alert(`Failed to delete account: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert(`Failed to delete account: ${error instanceof Error ? error.message : 'Network error'}`);
+    }
+
+    setShowToolMenu(false);
+  };
+
   return (
     <div className="relative">
       {/* Tool menu button - top right corner */}
@@ -135,6 +182,15 @@ function ProfilePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   Report Issue
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Account
                 </button>
               </div>
             </motion.div>
