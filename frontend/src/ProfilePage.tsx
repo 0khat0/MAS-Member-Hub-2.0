@@ -139,6 +139,60 @@ function ProfilePage() {
     setShowToolMenu(false);
   };
 
+  const handleDeleteFamily = async () => {
+    const memberEmail = localStorage.getItem('member_email');
+    if (!memberEmail) {
+      alert('No family email found');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Are you sure you want to delete the entire family account? This action cannot be undone and will permanently remove all family members and their data.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      console.log('Attempting to delete family:', memberEmail);
+      
+      // Get all family members first
+      const membersResponse = await fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
+      if (!membersResponse.ok) {
+        throw new Error('Failed to fetch family members');
+      }
+      
+      const familyMembers = await membersResponse.json();
+      
+      // Delete each family member
+      for (const member of familyMembers) {
+        const response = await fetch(`${API_URL}/member/${member.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+          throw new Error(`Failed to delete ${member.name}: ${errorData.detail || 'Unknown error'}`);
+        }
+      }
+
+      // Clear all data and redirect to home
+      clearMemberData();
+      window.history.replaceState(null, '', '/home');
+      window.location.href = '/home';
+    } catch (error) {
+      console.error('Error deleting family:', error);
+      alert(`Failed to delete family: ${error instanceof Error ? error.message : 'Network error'}`);
+    }
+
+    setShowToolMenu(false);
+  };
+
   return (
     <div className="relative">
       {/* Tool menu button - top right corner */}
@@ -183,15 +237,27 @@ function ProfilePage() {
                   </svg>
                   Report Issue
                 </button>
-                <button
-                  onClick={handleDeleteAccount}
-                  className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Delete Account
-                </button>
+                {memberId === 'family' ? (
+                  <button
+                    onClick={handleDeleteFamily}
+                    className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Family Account
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Account
+                  </button>
+                )}
               </div>
             </motion.div>
           )}

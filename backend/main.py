@@ -341,15 +341,53 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
         models.Checkin.timestamp <= end_utc
     ).order_by(models.Checkin.timestamp.desc()).all()
     
-    result = []
+    # Group check-ins by email and timestamp to identify families
+    grouped_checkins = {}
+    individual_checkins = []
+    
     for checkin, member in checkins:
-        # Send UTC timestamp (with 'Z' suffix) - let frontend handle timezone conversion
-        result.append({
+        # Create a key based on email and timestamp (within 1 minute)
+        timestamp_key = checkin.timestamp.replace(second=0, microsecond=0)
+        group_key = f"{member.email}_{timestamp_key.isoformat()}"
+        
+        if group_key not in grouped_checkins:
+            grouped_checkins[group_key] = {
+                "email": member.email,
+                "timestamp": checkin.timestamp,
+                "members": [],
+                "checkin_ids": []
+            }
+        
+        grouped_checkins[group_key]["members"].append({
             "checkin_id": str(checkin.id),
-            "email": member.email,
             "name": member.name,
-            "timestamp": checkin.timestamp.isoformat() + 'Z'  # Ensure UTC format
+            "email": member.email,
+            "timestamp": checkin.timestamp.isoformat() + 'Z'
         })
+        grouped_checkins[group_key]["checkin_ids"].append(str(checkin.id))
+    
+    result = []
+    for group_key, group_data in grouped_checkins.items():
+        if len(group_data["members"]) > 1:
+            # This is a family check-in
+            result.append({
+                "checkin_id": group_data["checkin_ids"][0],  # Use first checkin ID as primary
+                "email": group_data["email"],
+                "name": f"Family ({len(group_data['members'])} members)",
+                "timestamp": group_data["timestamp"].isoformat() + 'Z',
+                "is_family": True,
+                "family_members": group_data["members"],
+                "member_count": len(group_data["members"])
+            })
+        else:
+            # This is an individual check-in
+            individual_checkins.append(group_data["members"][0])
+    
+    # Add individual check-ins to result
+    result.extend(individual_checkins)
+    
+    # Sort by timestamp (most recent first)
+    result.sort(key=lambda x: x["timestamp"], reverse=True)
     
     return result
 
@@ -538,7 +576,7 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
 @app.post("/family/register")
 @limiter.limit("10/minute")
 async def register_family(request: Request, family_data: models.FamilyRegistration, db: Session = Depends(get_db)):
-    """Register multiple family members with one email and check them all in"""
+    """Register multiple family members with one email (no automatic check-in)"""
     email = family_data.email
     members = family_data.members
     
@@ -576,26 +614,11 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
     
     db.commit()
     
-    # Check in all members
-    toronto_tz = pytz.timezone('America/Toronto')
-    now = datetime.now(toronto_tz)
-    checkins = []
-    
-    for member in created_members:
-        db.refresh(member)
-        checkin = models.Checkin(member_id=member.id)
-        db.add(checkin)
-        checkins.append(checkin)
-        CHECKIN_COUNT.inc()
-    
-    db.commit()
-    
-    logger.info("Family registered and checked in", email=email, member_count=len(members))
+    logger.info("Family registered successfully", email=email, member_count=len(members))
     
     return {
-        "message": f"Family registered successfully. {len(members)} members checked in.",
+        "message": f"Family registered successfully. {len(members)} members added.",
         "members": [models.MemberOut.model_validate(m) for m in created_members],
-        "checkins": len(checkins),
         "member_ids": [str(m.id) for m in created_members]  # NEW: include member_ids for frontend
     }
 

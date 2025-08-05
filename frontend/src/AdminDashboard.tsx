@@ -8,6 +8,14 @@ interface DailyCheckin {
   email: string;
   name: string;
   timestamp: string;
+  is_family?: boolean;
+  family_members?: Array<{
+    checkin_id: string;
+    name: string;
+    email: string;
+    timestamp: string;
+  }>;
+  member_count?: number;
 }
 
 interface Member {
@@ -32,6 +40,9 @@ function AdminDashboard() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [isUpdatingMember, setIsUpdatingMember] = useState(false);
+
+  // Family check-in expansion state
+  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
 
 
 
@@ -196,6 +207,18 @@ function AdminDashboard() {
     setEditingMember(null);
     setEditName("");
     setEditEmail("");
+  };
+
+  const toggleFamilyExpansion = (checkinId: string) => {
+    setExpandedFamilies(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(checkinId)) {
+        newSet.delete(checkinId);
+      } else {
+        newSet.add(checkinId);
+      }
+      return newSet;
+    });
   };
 
 
@@ -452,22 +475,78 @@ function AdminDashboard() {
                 </thead>
                 <tbody>
                   {todayCheckins.map((checkin) => (
-                    <tr 
-                      key={checkin.checkin_id}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                    >
-                      <td className="py-3 px-4 text-white/90">{formatTime(checkin.timestamp)}</td>
-                      <td className="py-3 px-4 text-white/90 font-medium">{checkin.name}</td>
-                      <td className="py-3 px-4 text-white/90">
-                        <a 
-                          href={`mailto:${checkin.email}`}
-                          className="text-blue-400 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {checkin.email}
-                        </a>
-                      </td>
-                    </tr>
+                    <>
+                      <tr 
+                        key={checkin.checkin_id}
+                        className={`border-b border-white/5 transition-colors ${
+                          checkin.is_family 
+                            ? 'bg-purple-900/20 hover:bg-purple-900/30 border-purple-500/30' 
+                            : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <td className="py-3 px-4 text-white/90">{formatTime(checkin.timestamp)}</td>
+                        <td className="py-3 px-4 text-white/90 font-medium">
+                          <div className="flex items-center gap-2">
+                            {checkin.is_family && (
+                              <span className="text-purple-400 text-sm">👨‍👩‍👧‍👦</span>
+                            )}
+                            {checkin.name}
+                            {checkin.is_family && (
+                              <button
+                                onClick={() => toggleFamilyExpansion(checkin.checkin_id)}
+                                className="ml-2 text-purple-400 hover:text-purple-300 transition-colors"
+                                title="View family members"
+                              >
+                                <svg 
+                                  className={`w-4 h-4 transition-transform ${expandedFamilies.has(checkin.checkin_id) ? 'rotate-180' : ''}`} 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-white/90">
+                          <a 
+                            href={`mailto:${checkin.email}`}
+                            className="text-blue-400 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {checkin.email}
+                          </a>
+                        </td>
+                      </tr>
+                      {checkin.is_family && expandedFamilies.has(checkin.checkin_id) && checkin.family_members && (
+                        checkin.family_members.map((member) => (
+                          <tr 
+                            key={member.checkin_id}
+                            className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
+                          >
+                            <td className="py-2 px-4 text-white/70 text-sm pl-8">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                {formatTime(member.timestamp)}
+                              </div>
+                            </td>
+                            <td className="py-2 px-4 text-white/70 text-sm font-medium pl-8">
+                              {member.name}
+                            </td>
+                            <td className="py-2 px-4 text-white/70 text-sm pl-8">
+                              <a 
+                                href={`mailto:${member.email}`}
+                                className="text-blue-400 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {member.email}
+                              </a>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>

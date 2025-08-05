@@ -50,6 +50,7 @@ function MemberStats({ memberId }: Props) {
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeletingMember, setIsDeletingMember] = useState<string | null>(null);
   
   // Family member states
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -437,6 +438,62 @@ function MemberStats({ memberId }: Props) {
     }
   };
 
+  const handleDeleteMember = async (memberIdToDelete: string, memberName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${memberName}? This action cannot be undone and will permanently remove all their data.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingMember(memberIdToDelete);
+    try {
+      const API_URL = getApiUrl();
+      const response = await fetch(`${API_URL}/member/${memberIdToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Remove the member from the local state
+        setFamilyMembers(prev => prev.filter(m => m.id !== memberIdToDelete));
+        
+        // If this was the selected member, select the first remaining member
+        if (selectedMemberId === memberIdToDelete) {
+          const remainingMembers = familyMembers.filter(m => m.id !== memberIdToDelete);
+          if (remainingMembers.length > 0) {
+            setSelectedMemberId(remainingMembers[0].id);
+            setEditName(remainingMembers[0].name);
+            setEditEmail(remainingMembers[0].email);
+          }
+        }
+        
+        // If only one member remains, switch to individual mode
+        if (familyMembers.length === 2) { // 2 because we haven't updated the state yet
+          setIsFamily(false);
+          // Update localStorage to reflect single member
+          const remainingMember = familyMembers.find(m => m.id !== memberIdToDelete);
+          if (remainingMember) {
+            localStorage.setItem('member_id', remainingMember.id);
+            localStorage.removeItem('family_members');
+            localStorage.setItem('member_email', remainingMember.email);
+          }
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        alert(`Failed to delete ${memberName}: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      alert(`Failed to delete ${memberName}: ${error instanceof Error ? error.message : 'Network error'}`);
+    } finally {
+      setIsDeletingMember(null);
+    }
+  };
+
   // Load goal from localStorage when component mounts or selected member changes
   useEffect(() => {
     console.log('🔍 Goal Loading Effect Triggered:', {
@@ -639,14 +696,39 @@ function MemberStats({ memberId }: Props) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {familyMembers.filter(m => !m.is_deleted).map((member) => (
-                <button
+                <div
                   key={member.id}
-                  onClick={() => setSelectedMemberId(member.id)}
-                  className={`w-full text-left rounded-lg border-2 px-4 py-3 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-semibold ${selectedMemberId === member.id ? 'border-purple-500 bg-purple-900/40 text-white' : 'border-gray-600 bg-gray-800/60 text-white/80 hover:bg-purple-800/20'}`}
+                  className={`relative rounded-lg border-2 transition-all duration-200 focus-within:ring-2 focus-within:ring-purple-500 font-semibold ${selectedMemberId === member.id ? 'border-purple-500 bg-purple-900/40 text-white' : 'border-gray-600 bg-gray-800/60 text-white/80 hover:bg-purple-800/20'}`}
                 >
-                  <div className="text-lg font-bold">{member.name}</div>
-                  <div className="text-sm text-white/60">{member.email}</div>
-                </button>
+                  <button
+                    onClick={() => setSelectedMemberId(member.id)}
+                    className="w-full text-left px-4 py-3"
+                  >
+                    <div className="text-lg font-bold">{member.name}</div>
+                    <div className="text-sm text-white/60">{member.email}</div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteMember(member.id, member.name);
+                    }}
+                    disabled={isDeletingMember === member.id}
+                    className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                      isDeletingMember === member.id
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
+                    title={`Delete ${member.name}`}
+                  >
+                    {isDeletingMember === member.id ? (
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               ))}
             </div>
           </div>
