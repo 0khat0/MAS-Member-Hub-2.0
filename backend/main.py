@@ -367,12 +367,28 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
         family_groups[email]["timestamps"].append(checkin.timestamp)
     
     result = []
-    for email, group_data in family_groups.items():
-        # Check if this email has multiple family members in the database
+    
+    # OPTIMIZATION: Batch query all family members instead of N+1 queries
+    if family_groups:
+        # Get all unique emails that have check-ins today
+        all_emails = list(family_groups.keys())
+        
+        # Single batch query to get all family members for all emails
         all_family_members = db.query(models.Member).filter(
-            models.Member.email == email,
+            models.Member.email.in_(all_emails),
             models.Member.deleted_at.is_(None)
         ).all()
+        
+        # Group family members by email for fast lookup
+        family_members_by_email = {}
+        for member in all_family_members:
+            if member.email not in family_members_by_email:
+                family_members_by_email[member.email] = []
+            family_members_by_email[member.email].append(member)
+    
+    for email, group_data in family_groups.items():
+        # Check if this email has multiple family members in the database
+        all_family_members = family_members_by_email.get(email, [])
         
         if len(all_family_members) > 1:
             # This is a family - always treat as family regardless of how many are checked in

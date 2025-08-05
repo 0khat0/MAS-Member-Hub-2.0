@@ -94,6 +94,9 @@ function DedicatedScanner() {
         if ((window as any).refreshAdminCheckins) {
           (window as any).refreshAdminCheckins();
         }
+        if ((window as any).refreshAdminDashboard) {
+          (window as any).refreshAdminDashboard();
+        }
         if ((window as any).refreshMemberStats) {
           (window as any).refreshMemberStats();
         }

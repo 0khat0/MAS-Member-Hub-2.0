@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { getEasternTime } from './utils';
 
 interface DailyCheckin {
   checkin_id: string;
@@ -46,45 +45,36 @@ function AdminDashboard() {
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<Record<string, Set<string>>>({});
 
+  // Loading states
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-
-  // Authentication check removed - admin access is now open
-
-  useEffect(() => {
-    // Fetch today's check-ins
-    fetchTodayCheckins();
-    fetchStats();
-    fetchMembers(); // Add this to load members data
-    
-    // Expose refresh functions globally for external access
-    (window as any).refreshAdminStats = fetchStats;
-    (window as any).refreshAdminCheckins = fetchTodayCheckins;
-    
-    // Set up periodic stats refresh
-    const statsInterval = setInterval(() => {
-      fetchStats();
-    }, 30000); // every 30 seconds to reduce re-renders
-    
-    return () => {
-      delete (window as any).refreshAdminStats;
-      delete (window as any).refreshAdminCheckins;
-      clearInterval(statsInterval);
-    };
-  }, []);
-
-  useEffect(() => {
-    fetchTodayCheckins(); // initial fetch
-    const interval = setInterval(() => {
-      fetchTodayCheckins();
-    }, 10000); // every 10 seconds instead of 3 to reduce re-renders
-    return () => clearInterval(interval); // cleanup on unmount
-  }, []);
-
-  const fetchTodayCheckins = async () => {
+  // Define functions before useEffect
+  const fetchTodayCheckins = useCallback(async () => {
     try {
+      setIsRefreshing(true);
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${API_URL}/admin/checkins/today`);
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('Rate limited. Please wait before refreshing again.');
+          setTodayCheckins([]);
+          return;
+        }
+        console.error('Error response:', response.status, response.statusText);
+        setTodayCheckins([]);
+        return;
+      }
+      
       const data = await response.json();
+      
+      // Validate that data is an array
+      if (!Array.isArray(data)) {
+        console.error('Invalid data format received:', data);
+        setTodayCheckins([]);
+        return;
+      }
+      
       setTodayCheckins(data);
       
       // Initialize selected family members based on existing check-ins
@@ -93,7 +83,6 @@ function AdminDashboard() {
         if (checkin.is_family && checkin.family_members) {
           const selectedMembers = new Set<string>();
           checkin.family_members.forEach(member => {
-            // Add the checkin_id to the selected set since it represents an actual check-in
             selectedMembers.add(member.checkin_id);
           });
           initialSelectedState[checkin.checkin_id] = selectedMembers;
@@ -101,7 +90,7 @@ function AdminDashboard() {
       });
       setSelectedFamilyMembers(initialSelectedState);
       
-      // Preserve expanded families state - only initialize if empty
+      // Preserve expanded families state
       setExpandedFamilies(prev => {
         if (prev.size === 0) {
           return new Set();
@@ -110,8 +99,11 @@ function AdminDashboard() {
       });
     } catch (error) {
       console.error('Error fetching today\'s check-ins:', error);
+      setTodayCheckins([]);
+    } finally {
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -129,6 +121,16 @@ function AdminDashboard() {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${API_URL}/admin/checkins/stats`);
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('Rate limited. Please wait before refreshing stats.');
+          return;
+        }
+        console.error('Error fetching stats:', response.status, response.statusText);
+        return;
+      }
+      
       const data = await response.json();
       setStats(data);
     } catch (error) {
@@ -141,10 +143,28 @@ function AdminDashboard() {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${API_URL}/members`);
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('Rate limited. Please wait before refreshing members.');
+          setMembers([]);
+          return;
+        }
+        console.error('Error fetching members:', response.status, response.statusText);
+        setMembers([]);
+        return;
+      }
+      
       const data = await response.json();
-      setMembers(data);
+      if (Array.isArray(data)) {
+        setMembers(data);
+      } else {
+        console.error('Invalid members data format:', data);
+        setMembers([]);
+      }
     } catch (error) {
       console.error('Error fetching members:', error);
+      setMembers([]);
     } finally {
       setIsLoadingMembers(false);
     }
@@ -362,23 +382,85 @@ function AdminDashboard() {
 
 
 
-  // Login handler removed - admin access is now open
+  // Authentication check removed - admin access is now open
 
-
-
-  // Login form removed - admin access is now open
+  useEffect(() => {
+    // Initial fetch with delays to prevent rate limiting
+    const loadData = async () => {
+      await fetchTodayCheckins();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+      await fetchStats();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+      await fetchMembers();
+    };
+    
+    loadData();
+    
+    // Expose refresh functions globally for external access
+    (window as any).refreshAdminStats = fetchStats;
+    (window as any).refreshAdminCheckins = fetchTodayCheckins;
+    (window as any).refreshAdminDashboard = async () => {
+      await fetchTodayCheckins();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await fetchStats();
+    };
+    
+    // Remove auto-refresh to prevent rate limiting
+    // Only refresh manually or when triggered by QR scans
+    
+    return () => {
+      delete (window as any).refreshAdminStats;
+      delete (window as any).refreshAdminCheckins;
+      delete (window as any).refreshAdminDashboard;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 pb-24">
       <div className="max-w-7xl mx-auto space-y-6">
-        <motion.h1 
-          className="text-3xl md:text-4xl font-bold text-white mb-8 text-center"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          MAS Academy Member Hub - Admin Dashboard
-        </motion.h1>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-white/60">Manage members and monitor check-ins</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setIsRefreshing(true);
+                try {
+                  await fetchTodayCheckins();
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  await fetchStats();
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+              disabled={isRefreshing}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              {isRefreshing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  🔄 Refresh
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowMembersModal(true);
+                fetchMembers();
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              👥 Member List
+            </button>
+          </div>
+        </div>
 
         {/* Scanner Navigation */}
         <motion.div 
@@ -394,29 +476,6 @@ function AdminDashboard() {
             <span>🔍</span>
             <span>Open QR Scanner</span>
           </a>
-        </motion.div>
-
-        {/* Debug Timezone Info */}
-        <motion.div 
-          className="bg-gray-800/50 rounded-xl p-4 backdrop-blur-sm border border-yellow-500/20"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.05 }}
-        >
-          <div className="text-center">
-            <p className="text-yellow-400 text-sm font-medium mb-2">🌍 Toronto Timezone Debug Info</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-white/70">
-                              <div>
-                  <span className="text-white/50">Date:</span> {getEasternTime().toLocaleDateString('en-US', { timeZone: 'America/Toronto' })}
-                </div>
-                <div>
-                  <span className="text-white/50">Day:</span> {getEasternTime().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' })}
-                </div>
-                <div>
-                  <span className="text-white/50">Time:</span> {getEasternTime().toLocaleTimeString('en-US', { timeZone: 'America/Toronto' })}
-                </div>
-            </div>
-          </div>
         </motion.div>
 
         {/* Stats Overview */}
@@ -613,7 +672,7 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {todayCheckins.map((checkin, index) => (
+                  {Array.isArray(todayCheckins) ? todayCheckins.map((checkin, index) => (
                     <React.Fragment key={`fragment-${checkin.checkin_id}-${index}`}>
                       <tr 
                         key={`${checkin.checkin_id}-${index}`}
@@ -668,16 +727,10 @@ function AdminDashboard() {
                           </a>
                         </td>
                       </tr>
-                      {checkin.is_family && (() => {
-                        const isExpanded = expandedFamilies.has(checkin.checkin_id);
-                        console.log('Family expansion check:', checkin.checkin_id, 'expanded:', isExpanded);
-                        return isExpanded;
-                      })() && (
+                      {checkin.is_family && expandedFamilies.has(checkin.checkin_id) && (
                         // Get all family members for this email
                         (() => {
                           const familyMembers = members.filter(m => m.email === checkin.email);
-                          console.log('Family members found for', checkin.email, ':', familyMembers.length);
-                          console.log('All members count:', members.length);
                           return familyMembers.map((member) => {
                             // Find if this member has a check-in in today's data
                             const memberCheckin = checkin.family_members?.find(m => m.member_id === member.id);
@@ -722,7 +775,13 @@ function AdminDashboard() {
                         })()
                       )}
                     </React.Fragment>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-white/60">
+                        Loading check-ins...
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}

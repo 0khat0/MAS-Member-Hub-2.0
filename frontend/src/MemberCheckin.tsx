@@ -192,6 +192,11 @@ function MemberCheckin() {
                     if (res.ok) {
                       await res.json(); // Remove unused variable
                       setSelectedFamilyMembers([]);
+                      
+                      // Trigger admin dashboard refresh
+                      if ((window as any).refreshAdminDashboard) {
+                        (window as any).refreshAdminDashboard();
+                      }
                     } else {
                       const err = await res.json();
                       setStatus("error");
