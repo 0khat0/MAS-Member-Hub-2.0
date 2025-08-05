@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { getEasternTime } from './utils';
@@ -14,6 +14,7 @@ interface DailyCheckin {
     name: string;
     email: string;
     timestamp: string;
+    member_id: string;
   }>;
   member_count?: number;
 }
@@ -53,6 +54,7 @@ function AdminDashboard() {
     // Fetch today's check-ins
     fetchTodayCheckins();
     fetchStats();
+    fetchMembers(); // Add this to load members data
     
     // Expose refresh functions globally for external access
     (window as any).refreshAdminStats = fetchStats;
@@ -61,7 +63,7 @@ function AdminDashboard() {
     // Set up periodic stats refresh
     const statsInterval = setInterval(() => {
       fetchStats();
-    }, 10000); // every 10 seconds
+    }, 30000); // every 30 seconds to reduce re-renders
     
     return () => {
       delete (window as any).refreshAdminStats;
@@ -74,7 +76,7 @@ function AdminDashboard() {
     fetchTodayCheckins(); // initial fetch
     const interval = setInterval(() => {
       fetchTodayCheckins();
-    }, 3000); // every 3 seconds for more responsive updates
+    }, 10000); // every 10 seconds instead of 3 to reduce re-renders
     return () => clearInterval(interval); // cleanup on unmount
   }, []);
 
@@ -84,6 +86,28 @@ function AdminDashboard() {
       const response = await fetch(`${API_URL}/admin/checkins/today`);
       const data = await response.json();
       setTodayCheckins(data);
+      
+      // Initialize selected family members based on existing check-ins
+      const initialSelectedState: Record<string, Set<string>> = {};
+      data.forEach((checkin: DailyCheckin) => {
+        if (checkin.is_family && checkin.family_members) {
+          const selectedMembers = new Set<string>();
+          checkin.family_members.forEach(member => {
+            // Add the checkin_id to the selected set since it represents an actual check-in
+            selectedMembers.add(member.checkin_id);
+          });
+          initialSelectedState[checkin.checkin_id] = selectedMembers;
+        }
+      });
+      setSelectedFamilyMembers(initialSelectedState);
+      
+      // Preserve expanded families state - only initialize if empty
+      setExpandedFamilies(prev => {
+        if (prev.size === 0) {
+          return new Set();
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Error fetching today\'s check-ins:', error);
     }
@@ -211,38 +235,100 @@ function AdminDashboard() {
   };
 
   const toggleFamilyExpansion = (checkinId: string) => {
+    console.log('Toggle clicked for:', checkinId);
+    console.log('Current expanded families:', Array.from(expandedFamilies));
     setExpandedFamilies(prev => {
       const newSet = new Set(prev);
       if (newSet.has(checkinId)) {
         newSet.delete(checkinId);
+        console.log('Removing from expanded');
       } else {
         newSet.add(checkinId);
+        console.log('Adding to expanded');
       }
+      console.log('New expanded families:', Array.from(newSet));
       return newSet;
     });
   };
 
-  const toggleFamilyMemberSelection = (checkinId: string, memberCheckinId: string) => {
-    setSelectedFamilyMembers(prev => {
-      const newState = { ...prev };
-      if (!newState[checkinId]) {
-        newState[checkinId] = new Set();
-      }
+  const toggleFamilyMemberSelection = async (checkinId: string, memberCheckinId: string, memberId: string, memberName: string, timestamp: string) => {
+    const isCurrentlySelected = selectedFamilyMembers[checkinId]?.has(memberCheckinId);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       
-      const memberSet = new Set(newState[checkinId]);
-      if (memberSet.has(memberCheckinId)) {
-        memberSet.delete(memberCheckinId);
+      if (isCurrentlySelected && memberCheckinId) {
+        // Remove check-in (only if there's an actual check-in to remove)
+        const response = await fetch(`${API_URL}/admin/checkin/${memberCheckinId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          // Update local state
+          setSelectedFamilyMembers(prev => {
+            const newState = { ...prev };
+            if (newState[checkinId]) {
+              const memberSet = new Set(newState[checkinId]);
+              memberSet.delete(memberCheckinId);
+              newState[checkinId] = memberSet;
+            }
+            return newState;
+          });
+          
+          // Refresh today's check-ins to update counts and get fresh data
+          fetchTodayCheckins();
+        } else {
+          console.error('Failed to remove check-in');
+        }
       } else {
-        memberSet.add(memberCheckinId);
+        // Add check-in
+        const response = await fetch(`${API_URL}/admin/checkin/member`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            member_id: memberId,
+            timestamp: timestamp
+          }),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          
+          // Update local state with new check-in ID
+          setSelectedFamilyMembers(prev => {
+            const newState = { ...prev };
+            if (!newState[checkinId]) {
+              newState[checkinId] = new Set();
+            }
+            const memberSet = new Set(newState[checkinId]);
+            memberSet.add(result.checkin_id);
+            newState[checkinId] = memberSet;
+            return newState;
+          });
+          
+          // Refresh today's check-ins to update counts and get fresh data
+          fetchTodayCheckins();
+        } else {
+          console.error('Failed to add check-in');
+        }
       }
-      
-      newState[checkinId] = memberSet;
-      return newState;
-    });
+    } catch (error) {
+      console.error('Error toggling member selection:', error);
+    }
   };
 
   const isFamilyMemberSelected = (checkinId: string, memberCheckinId: string) => {
+    // Check if this member's check-in ID is in the selected set
     return selectedFamilyMembers[checkinId]?.has(memberCheckinId) || false;
+  };
+
+  const getSelectedCount = (checkinId: string) => {
+    return selectedFamilyMembers[checkinId]?.size || 0;
   };
 
 
@@ -498,10 +584,10 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {todayCheckins.map((checkin) => (
-                    <>
+                  {todayCheckins.map((checkin, index) => (
+                    <React.Fragment key={`fragment-${checkin.checkin_id}-${index}`}>
                       <tr 
-                        key={checkin.checkin_id}
+                        key={`${checkin.checkin_id}-${index}`}
                         className={`border-b border-white/5 transition-colors ${
                           checkin.is_family 
                             ? 'bg-purple-900/20 hover:bg-purple-900/30 border-purple-500/30' 
@@ -518,8 +604,11 @@ function AdminDashboard() {
                             {checkin.is_family && (
                               <>
                                 <button
-                                  onClick={() => toggleFamilyExpansion(checkin.checkin_id)}
-                                  className="ml-2 text-purple-400 hover:text-purple-300 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFamilyExpansion(checkin.checkin_id);
+                                  }}
+                                  className="ml-2 p-1 text-purple-400 hover:text-purple-300 hover:bg-purple-900/20 rounded transition-colors"
                                   title="View family members"
                                 >
                                   <svg 
@@ -550,42 +639,64 @@ function AdminDashboard() {
                           </a>
                         </td>
                       </tr>
-                      {checkin.is_family && expandedFamilies.has(checkin.checkin_id) && checkin.family_members && (
-                        checkin.family_members.map((member) => (
-                          <tr 
-                            key={member.checkin_id}
-                            className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
-                          >
-                            <td className="py-2 px-4 text-white/70 text-sm pl-8">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                                {formatTime(member.timestamp)}
-                              </div>
-                            </td>
-                            <td className="py-2 px-4 text-white/70 text-sm font-medium pl-8">
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={isFamilyMemberSelected(checkin.checkin_id, member.checkin_id)}
-                                  onChange={() => toggleFamilyMemberSelection(checkin.checkin_id, member.checkin_id)}
-                                  className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
-                                />
-                                {member.name}
-                              </div>
-                            </td>
-                            <td className="py-2 px-4 text-white/70 text-sm pl-8">
-                              <a 
-                                href={`mailto:${member.email}`}
-                                className="text-blue-400 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
+                      {checkin.is_family && (() => {
+                        const isExpanded = expandedFamilies.has(checkin.checkin_id);
+                        console.log('Family expansion check:', checkin.checkin_id, 'expanded:', isExpanded);
+                        return isExpanded;
+                      })() && (
+                        // Get all family members for this email
+                        (() => {
+                          const familyMembers = members.filter(m => m.email === checkin.email);
+                          console.log('Family members found for', checkin.email, ':', familyMembers.length);
+                          console.log('All members count:', members.length);
+                          return familyMembers.map((member) => {
+                            // Find if this member has a check-in in today's data
+                            const memberCheckin = checkin.family_members?.find(m => m.member_id === member.id);
+                            const isCheckedIn = memberCheckin ? isFamilyMemberSelected(checkin.checkin_id, memberCheckin.checkin_id) : false;
+                            
+                            return (
+                              <tr 
+                                key={`${member.id}-${memberCheckin?.checkin_id || 'no-checkin'}`}
+                                className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
                               >
-                                {member.email}
-                              </a>
-                            </td>
-                          </tr>
-                        ))
+                                <td className="py-2 px-4 text-white/70 text-sm pl-8">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                    {memberCheckin ? formatTime(memberCheckin.timestamp) : 'Not checked in'}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-4 text-white/70 text-sm font-medium pl-8">
+                                  <div className="flex items-center gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isCheckedIn}
+                                      onChange={() => toggleFamilyMemberSelection(
+                                        checkin.checkin_id, 
+                                        memberCheckin?.checkin_id || '',
+                                        member.id,
+                                        member.name,
+                                        memberCheckin?.timestamp || new Date().toISOString()
+                                      )}
+                                      className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                                    />
+                                    {member.name}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-4 text-white/70 text-sm pl-8">
+                                  <a 
+                                    href={`mailto:${member.email}`}
+                                    className="text-blue-400 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {member.email}
+                                  </a>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

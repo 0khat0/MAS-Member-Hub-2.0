@@ -672,10 +672,10 @@ function MemberStats({ memberId }: Props) {
           {(() => {
             let qrData = null;
             if (isFamily && familyMembers.length > 1) {
-              // For family, use the primary member's barcode
-              qrData = stats.barcode;
+              // For family, use the email as the shared identifier
+              qrData = stats.email;
             } else if (stats.barcode) {
-              // For individual member, just use the barcode
+              // For individual member, use the barcode
               qrData = stats.barcode;
             }
             return qrData ? (

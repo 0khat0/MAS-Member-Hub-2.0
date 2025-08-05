@@ -362,7 +362,8 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
             "checkin_id": str(checkin.id),
             "name": member.name,
             "email": member.email,
-            "timestamp": checkin.timestamp.isoformat() + 'Z'
+            "timestamp": checkin.timestamp.isoformat() + 'Z',
+            "member_id": str(member.id)
         })
         grouped_checkins[group_key]["checkin_ids"].append(str(checkin.id))
     
@@ -1052,40 +1053,57 @@ async def add_family_members(request: Request, add_data: dict, db: Session = Dep
 @app.get("/member/lookup-by-barcode/{barcode}")
 @limiter.limit("50/minute")  # Higher limit for scanning operations
 async def lookup_member_by_barcode(request: Request, barcode: str, db: Session = Depends(get_db)):
-    """Look up a member by their barcode for scanning check-in"""
+    """Look up a member by their barcode or email for scanning check-in"""
     if not barcode:
-        raise HTTPException(status_code=400, detail="Barcode is required")
+        raise HTTPException(status_code=400, detail="Barcode or email is required")
     
-    # Find member by barcode
+    # First try to find by barcode
     member = db.query(models.Member).filter(
         models.Member.barcode == barcode,
         models.Member.deleted_at.is_(None)
     ).first()
     
     if not member:
-        raise HTTPException(status_code=404, detail="Member not found with this barcode")
-    
-    logger.info("Member looked up by barcode", member_id=str(member.id), barcode=barcode, member_name=member.name)
+        # If not found by barcode, try by email (for family QR codes)
+        member = db.query(models.Member).filter(
+            models.Member.email == barcode,
+            models.Member.deleted_at.is_(None)
+        ).first()
+        
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found with this barcode or email")
+        
+        # For family QR codes, return the first family member as representative
+        logger.info("Family QR code scanned", email=barcode, member_id=str(member.id), member_name=member.name)
+    else:
+        logger.info("Individual barcode scanned", member_id=str(member.id), barcode=barcode, member_name=member.name)
     
     return models.MemberOut.model_validate(member)
 
 @app.post("/checkin-by-barcode")
 @limiter.limit("50/minute")  # Higher limit for scanning operations
 async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session = Depends(get_db)):
-    """Check in a member using their barcode - automatically handles family check-ins"""
+    """Check in a member using their barcode or email - automatically handles family check-ins"""
     barcode = checkin_data.get("barcode")
     
     if not barcode:
-        raise HTTPException(status_code=400, detail="Barcode is required")
+        raise HTTPException(status_code=400, detail="Barcode or email is required")
     
-    # Find member by barcode
+    # First try to find by barcode
     member = db.query(models.Member).filter(
         models.Member.barcode == barcode,
         models.Member.deleted_at.is_(None)
     ).first()
     
     if not member:
-        raise HTTPException(status_code=404, detail="Member not found with this barcode")
+        # If not found by barcode, try by email (for family QR codes)
+        member = db.query(models.Member).filter(
+            models.Member.email == barcode,
+            models.Member.deleted_at.is_(None)
+        ).first()
+        
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found with this barcode or email")
     
     # Get timezone for Eastern
     eastern_tz = pytz.timezone('America/New_York')
@@ -1110,8 +1128,10 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
     ).all()
     
     if len(family_members) > 1:
-        # This is a family - check in all family members
+        # This is a family - check in all family members with the same timestamp
         checked_in_members = []
+        family_timestamp = datetime.now(pytz.UTC)  # Use the same timestamp for all family members
+        
         for family_member in family_members:
             # Check if this family member already checked in today
             existing_family_checkin = db.query(models.Checkin).filter(
@@ -1121,8 +1141,8 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
             ).first()
             
             if not existing_family_checkin:
-                # Create check-in for this family member
-                family_checkin = models.Checkin(member_id=family_member.id)
+                # Create check-in for this family member with the same timestamp
+                family_checkin = models.Checkin(member_id=family_member.id, timestamp=family_timestamp)
                 db.add(family_checkin)
                 checked_in_members.append(family_member.name)
         
@@ -1131,7 +1151,7 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
         # Update metrics
         CHECKIN_COUNT.inc(len(checked_in_members))
         
-        logger.info("Family checked in by barcode", 
+        logger.info("Family checked in by barcode/email", 
                    primary_member_id=str(member.id), 
                    barcode=barcode, 
                    family_size=len(family_members),
@@ -1155,7 +1175,7 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
         # Update metrics
         CHECKIN_COUNT.inc()
         
-        logger.info("Individual member checked in by barcode", 
+        logger.info("Individual member checked in by barcode/email", 
                    member_id=str(member.id), 
                    barcode=barcode, 
                    checkin_id=str(checkin.id))
@@ -1168,5 +1188,101 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
             "checkin_id": str(checkin.id),
             "timestamp": checkin.timestamp
         }
+
+@app.post("/admin/checkin/member")
+@limiter.limit("10/minute")
+async def admin_checkin_member(request: Request, checkin_data: dict, db: Session = Depends(get_db)):
+    """Admin endpoint to check in a specific family member"""
+    member_id = checkin_data.get("member_id")
+    timestamp_str = checkin_data.get("timestamp")  # Optional, defaults to now
+    
+    if not member_id:
+        raise HTTPException(status_code=400, detail="Member ID is required")
+    
+    # Validate UUID format
+    if not is_valid_uuid(member_id):
+        raise HTTPException(status_code=400, detail="Invalid member ID format")
+    
+    # Get member
+    member = db.query(models.Member).filter(
+        models.Member.id == uuid.UUID(member_id),
+        models.Member.deleted_at.is_(None)
+    ).first()
+    
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    
+    # Use provided timestamp or current time
+    if timestamp_str:
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
+    else:
+        timestamp = datetime.now(pytz.UTC)
+    
+    # Check if already checked in at this timestamp (within 1 minute)
+    start_time = timestamp - timedelta(minutes=1)
+    end_time = timestamp + timedelta(minutes=1)
+    
+    existing = db.query(models.Checkin).filter(
+        models.Checkin.member_id == uuid.UUID(member_id),
+        models.Checkin.timestamp >= start_time,
+        models.Checkin.timestamp <= end_time
+    ).first()
+    
+    if existing:
+        return {
+            "message": "Member already checked in at this time",
+            "checkin_id": str(existing.id),
+            "already_checked_in": True
+        }
+    
+    # Create check-in
+    checkin = models.Checkin(member_id=uuid.UUID(member_id), timestamp=timestamp)
+    db.add(checkin)
+    db.commit()
+    db.refresh(checkin)
+    
+    # Update metrics
+    CHECKIN_COUNT.inc()
+    
+    logger.info("Admin check-in created", member_id=member_id, member_name=member.name, checkin_id=str(checkin.id))
+    
+    return {
+        "message": f"{member.name} checked in successfully",
+        "checkin_id": str(checkin.id),
+        "member_name": member.name,
+        "timestamp": checkin.timestamp.isoformat(),
+        "already_checked_in": False
+    }
+
+@app.delete("/admin/checkin/{checkin_id}")
+@limiter.limit("10/minute")
+async def admin_delete_checkin(request: Request, checkin_id: str, db: Session = Depends(get_db)):
+    """Admin endpoint to delete a specific check-in"""
+    if not is_valid_uuid(checkin_id):
+        raise HTTPException(status_code=400, detail="Invalid check-in ID format")
+    
+    # Get check-in
+    checkin = db.query(models.Checkin).filter(models.Checkin.id == uuid.UUID(checkin_id)).first()
+    
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Check-in not found")
+    
+    # Get member name for logging
+    member = db.query(models.Member).filter(models.Member.id == checkin.member_id).first()
+    member_name = member.name if member else "Unknown"
+    
+    # Delete check-in
+    db.delete(checkin)
+    db.commit()
+    
+    logger.info("Admin check-in deleted", checkin_id=checkin_id, member_name=member_name)
+    
+    return {
+        "message": f"Check-in for {member_name} deleted successfully",
+        "deleted_checkin_id": checkin_id
+    }
 
 # Admin authentication removed - admin routes are now open access 
