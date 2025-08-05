@@ -341,47 +341,48 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
         models.Checkin.timestamp <= end_utc
     ).order_by(models.Checkin.timestamp.desc()).all()
     
-    # Group check-ins by email and timestamp to identify families
-    grouped_checkins = {}
+    # Group check-ins by email to identify families
+    family_groups = {}
     individual_checkins = []
     
     for checkin, member in checkins:
-        # Create a key based on email and timestamp (within 1 minute)
-        timestamp_key = checkin.timestamp.replace(second=0, microsecond=0)
-        group_key = f"{member.email}_{timestamp_key.isoformat()}"
+        email = member.email
         
-        if group_key not in grouped_checkins:
-            grouped_checkins[group_key] = {
-                "email": member.email,
-                "timestamp": checkin.timestamp,
+        if email not in family_groups:
+            family_groups[email] = {
+                "email": email,
                 "members": [],
-                "checkin_ids": []
+                "checkin_ids": [],
+                "timestamps": []
             }
         
-        grouped_checkins[group_key]["members"].append({
+        family_groups[email]["members"].append({
             "checkin_id": str(checkin.id),
             "name": member.name,
             "email": member.email,
             "timestamp": checkin.timestamp.isoformat() + 'Z',
             "member_id": str(member.id)
         })
-        grouped_checkins[group_key]["checkin_ids"].append(str(checkin.id))
+        family_groups[email]["checkin_ids"].append(str(checkin.id))
+        family_groups[email]["timestamps"].append(checkin.timestamp)
     
     result = []
-    for group_key, group_data in grouped_checkins.items():
+    for email, group_data in family_groups.items():
         # Check if this email has multiple family members in the database
         all_family_members = db.query(models.Member).filter(
-            models.Member.email == group_data["email"],
+            models.Member.email == email,
             models.Member.deleted_at.is_(None)
         ).all()
         
         if len(all_family_members) > 1:
             # This is a family - always treat as family regardless of how many are checked in
+            # Use the earliest timestamp as the family timestamp to maintain consistency
+            family_timestamp = min(group_data["timestamps"])
             result.append({
                 "checkin_id": group_data["checkin_ids"][0],  # Use first checkin ID as primary
-                "email": group_data["email"],
+                "email": email,
                 "name": "Family",
-                "timestamp": group_data["timestamp"].isoformat() + 'Z',
+                "timestamp": family_timestamp.isoformat() + 'Z',
                 "is_family": True,
                 "family_members": group_data["members"],
                 "member_count": len(group_data["members"])
