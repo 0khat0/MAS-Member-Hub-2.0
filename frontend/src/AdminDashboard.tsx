@@ -278,8 +278,19 @@ function AdminDashboard() {
             return newState;
           });
           
-          // Refresh today's check-ins to update counts and get fresh data
-          fetchTodayCheckins();
+          // Update today's check-ins data locally instead of refetching
+          setTodayCheckins(prev => {
+            return prev.map(checkin => {
+              if (checkin.checkin_id === checkinId && checkin.family_members) {
+                return {
+                  ...checkin,
+                  family_members: checkin.family_members.filter(member => member.checkin_id !== memberCheckinId),
+                  member_count: checkin.family_members.filter(member => member.checkin_id !== memberCheckinId).length
+                };
+              }
+              return checkin;
+            });
+          });
         } else {
           console.error('Failed to remove check-in');
         }
@@ -311,8 +322,26 @@ function AdminDashboard() {
             return newState;
           });
           
-          // Refresh today's check-ins to update counts and get fresh data
-          fetchTodayCheckins();
+          // Update today's check-ins data locally instead of refetching
+          setTodayCheckins(prev => {
+            return prev.map(checkin => {
+              if (checkin.checkin_id === checkinId) {
+                const newMember = {
+                  checkin_id: result.checkin_id,
+                  name: memberName,
+                  email: checkin.email,
+                  timestamp: result.timestamp,
+                  member_id: memberId
+                };
+                return {
+                  ...checkin,
+                  family_members: [...(checkin.family_members || []), newMember],
+                  member_count: (checkin.family_members?.length || 0) + 1
+                };
+              }
+              return checkin;
+            });
+          });
         } else {
           console.error('Failed to add check-in');
         }
