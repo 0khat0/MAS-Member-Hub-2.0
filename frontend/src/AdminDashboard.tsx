@@ -299,10 +299,10 @@ function AdminDashboard() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-gray-900 rounded-xl shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden"
+                className="bg-gray-900 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
                 onClick={e => e.stopPropagation()}
               >
-                <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                <div className="p-6 border-b border-white/10 flex justify-between items-center flex-shrink-0">
                   <h2 className="text-2xl font-semibold text-white">Member List</h2>
                   <button
                     onClick={() => setShowMembersModal(false)}
@@ -313,7 +313,7 @@ function AdminDashboard() {
                     </svg>
                   </button>
                 </div>
-                <div className="px-6 pt-4 pb-2">
+                <div className="px-6 pt-4 pb-2 flex-shrink-0">
                   <input
                     type="text"
                     placeholder="Search members by name or email..."
@@ -323,102 +323,104 @@ function AdminDashboard() {
                     autoFocus
                   />
                 </div>
-                <div className="p-6 overflow-auto max-h-[80vh]">
+                <div className="flex-1 overflow-y-auto p-6">
                   {isLoadingMembers ? (
                     <div className="flex justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
                     </div>
                   ) : (
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-white/10">
-                          <th className="text-left py-3 px-4 text-white/70 font-medium">Name</th>
-                          <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
-                          <th className="text-left py-3 px-4 text-white/70 font-medium">Joined</th>
-                          <th className="text-left py-3 px-4 text-white/70 font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {members.filter(m =>
-                          m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                          m.email.toLowerCase().includes(memberSearch.toLowerCase())
-                        ).map((member) => (
-                          <tr 
-                            key={member.id}
-                            className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                          >
-                            <td className="py-3 px-4 text-white/90 font-medium">
-                              {editingMember?.id === member.id ? (
-                                <input
-                                  type="text"
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  disabled={isUpdatingMember}
-                                />
-                              ) : (
-                                member.name
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-white/90">
-                              {editingMember?.id === member.id ? (
-                                <input
-                                  type="email"
-                                  value={editEmail}
-                                  onChange={(e) => setEditEmail(e.target.value)}
-                                  className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  disabled={isUpdatingMember}
-                                />
-                              ) : (
-                                <a 
-                                  href={`mailto:${member.email}`}
-                                  className="text-blue-400 hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {member.email}
-                                </a>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
-                            <td className="py-3 px-4">
-                              {editingMember?.id === member.id ? (
-                                <div className="flex gap-2">
-                                  <button
-                                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-3 py-1 rounded text-xs"
-                                    onClick={handleUpdateMember}
-                                    disabled={isUpdatingMember}
-                                  >
-                                    {isUpdatingMember ? "Saving..." : "Save"}
-                                  </button>
-                                  <button
-                                    className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-3 py-1 rounded text-xs"
-                                    onClick={cancelEdit}
-                                    disabled={isUpdatingMember}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex gap-2">
-                                  <button
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 rounded text-xs"
-                                    onClick={() => handleEditMember(member)}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1 rounded text-xs"
-                                    onClick={() => handleDeleteMember(member)}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </td>
+                    <div className="min-h-0 flex-1">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-gray-900 z-10">
+                          <tr className="border-b border-white/10">
+                            <th className="text-left py-3 px-4 text-white/70 font-medium">Name</th>
+                            <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
+                            <th className="text-left py-3 px-4 text-white/70 font-medium">Joined</th>
+                            <th className="text-left py-3 px-4 text-white/70 font-medium">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {members.filter(m =>
+                            m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+                            m.email.toLowerCase().includes(memberSearch.toLowerCase())
+                          ).map((member) => (
+                            <tr 
+                              key={member.id}
+                              className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                            >
+                              <td className="py-3 px-4 text-white/90 font-medium">
+                                {editingMember?.id === member.id ? (
+                                  <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    disabled={isUpdatingMember}
+                                  />
+                                ) : (
+                                  member.name
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-white/90">
+                                {editingMember?.id === member.id ? (
+                                  <input
+                                    type="email"
+                                    value={editEmail}
+                                    onChange={(e) => setEditEmail(e.target.value)}
+                                    className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    disabled={isUpdatingMember}
+                                  />
+                                ) : (
+                                  <a 
+                                    href={`mailto:${member.email}`}
+                                    className="text-blue-400 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {member.email}
+                                  </a>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
+                              <td className="py-3 px-4">
+                                {editingMember?.id === member.id ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                      onClick={handleUpdateMember}
+                                      disabled={isUpdatingMember}
+                                    >
+                                      {isUpdatingMember ? "Saving..." : "Save"}
+                                    </button>
+                                    <button
+                                      className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                      onClick={cancelEdit}
+                                      disabled={isUpdatingMember}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <button
+                                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                      onClick={() => handleEditMember(member)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1 rounded text-xs"
+                                      onClick={() => handleDeleteMember(member)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               </motion.div>
