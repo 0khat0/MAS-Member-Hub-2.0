@@ -947,14 +947,14 @@ function MemberStats({ memberId }: Props) {
                 </button>
               </div>
             </div>
-            {/* Monthly Home Page Card */}
+            {/* Monthly Check Ins Card */}
             <div className="bg-[#232736] border border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-3xl text-blue-400">📅</span>
                 <span className="text-lg font-bold text-white">This Month</span>
               </div>
               <div className="text-4xl font-extrabold text-white mb-1">{stats.monthly_check_ins}</div>
-                              <div className="text-sm text-white/70">Home Page</div>
+                              <div className="text-sm text-white/70">Check-ins</div>
             </div>
           </div>
         </div>

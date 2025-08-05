@@ -369,17 +369,23 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
     
     result = []
     for group_key, group_data in grouped_checkins.items():
-        if len(group_data["members"]) > 1:
-            # This is a family check-in
-                         result.append({
-                 "checkin_id": group_data["checkin_ids"][0],  # Use first checkin ID as primary
-                 "email": group_data["email"],
-                 "name": "Family",
-                 "timestamp": group_data["timestamp"].isoformat() + 'Z',
-                 "is_family": True,
-                 "family_members": group_data["members"],
-                 "member_count": len(group_data["members"])
-             })
+        # Check if this email has multiple family members in the database
+        all_family_members = db.query(models.Member).filter(
+            models.Member.email == group_data["email"],
+            models.Member.deleted_at.is_(None)
+        ).all()
+        
+        if len(all_family_members) > 1:
+            # This is a family - always treat as family regardless of how many are checked in
+            result.append({
+                "checkin_id": group_data["checkin_ids"][0],  # Use first checkin ID as primary
+                "email": group_data["email"],
+                "name": "Family",
+                "timestamp": group_data["timestamp"].isoformat() + 'Z',
+                "is_family": True,
+                "family_members": group_data["members"],
+                "member_count": len(group_data["members"])
+            })
         else:
             # This is an individual check-in
             individual_checkins.append(group_data["members"][0])
