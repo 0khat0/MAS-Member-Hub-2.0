@@ -660,10 +660,6 @@ function AdminDashboard() {
                                 className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
                               >
                                 <td className="py-2 px-4 text-white/70 text-sm pl-8">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                                    {memberCheckin ? formatTime(memberCheckin.timestamp) : 'Not checked in'}
-                                  </div>
                                 </td>
                                 <td className="py-2 px-4 text-white/70 text-sm font-medium pl-8">
                                   <div className="flex items-center gap-3">
