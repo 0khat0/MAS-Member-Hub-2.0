@@ -43,6 +43,7 @@ function AdminDashboard() {
 
   // Family check-in expansion state
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<Record<string, Set<string>>>({});
 
 
 
@@ -219,6 +220,29 @@ function AdminDashboard() {
       }
       return newSet;
     });
+  };
+
+  const toggleFamilyMemberSelection = (checkinId: string, memberCheckinId: string) => {
+    setSelectedFamilyMembers(prev => {
+      const newState = { ...prev };
+      if (!newState[checkinId]) {
+        newState[checkinId] = new Set();
+      }
+      
+      const memberSet = new Set(newState[checkinId]);
+      if (memberSet.has(memberCheckinId)) {
+        memberSet.delete(memberCheckinId);
+      } else {
+        memberSet.add(memberCheckinId);
+      }
+      
+      newState[checkinId] = memberSet;
+      return newState;
+    });
+  };
+
+  const isFamilyMemberSelected = (checkinId: string, memberCheckinId: string) => {
+    return selectedFamilyMembers[checkinId]?.has(memberCheckinId) || false;
   };
 
 
@@ -492,20 +516,27 @@ function AdminDashboard() {
                             )}
                             {checkin.name}
                             {checkin.is_family && (
-                              <button
-                                onClick={() => toggleFamilyExpansion(checkin.checkin_id)}
-                                className="ml-2 text-purple-400 hover:text-purple-300 transition-colors"
-                                title="View family members"
-                              >
-                                <svg 
-                                  className={`w-4 h-4 transition-transform ${expandedFamilies.has(checkin.checkin_id) ? 'rotate-180' : ''}`} 
-                                  fill="none" 
-                                  stroke="currentColor" 
-                                  viewBox="0 0 24 24"
+                              <>
+                                <button
+                                  onClick={() => toggleFamilyExpansion(checkin.checkin_id)}
+                                  className="ml-2 text-purple-400 hover:text-purple-300 transition-colors"
+                                  title="View family members"
                                 >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </button>
+                                  <svg 
+                                    className={`w-4 h-4 transition-transform ${expandedFamilies.has(checkin.checkin_id) ? 'rotate-180' : ''}`} 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                                {selectedFamilyMembers[checkin.checkin_id] && selectedFamilyMembers[checkin.checkin_id].size > 0 && (
+                                  <span className="ml-2 text-xs bg-purple-600 text-white px-2 py-1 rounded-full">
+                                    {selectedFamilyMembers[checkin.checkin_id].size} selected
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -532,7 +563,15 @@ function AdminDashboard() {
                               </div>
                             </td>
                             <td className="py-2 px-4 text-white/70 text-sm font-medium pl-8">
-                              {member.name}
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isFamilyMemberSelected(checkin.checkin_id, member.checkin_id)}
+                                  onChange={() => toggleFamilyMemberSelection(checkin.checkin_id, member.checkin_id)}
+                                  className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                                />
+                                {member.name}
+                              </div>
                             </td>
                             <td className="py-2 px-4 text-white/70 text-sm pl-8">
                               <a 
