@@ -87,18 +87,9 @@ function DedicatedScanner() {
           success: true
         }, ...prev.slice(0, 9)]); // Keep last 10 scans
         
-        // Trigger real-time updates on other pages
-        if ((window as any).refreshAdminStats) {
-          (window as any).refreshAdminStats();
-        }
-        if ((window as any).refreshAdminCheckins) {
-          (window as any).refreshAdminCheckins();
-        }
+        // Trigger dashboard update (includes check-ins and stats with delay)
         if ((window as any).refreshAdminDashboard) {
           (window as any).refreshAdminDashboard();
-        }
-        if ((window as any).refreshMemberStats) {
-          (window as any).refreshMemberStats();
         }
       } else {
         const errorData = await response.json();

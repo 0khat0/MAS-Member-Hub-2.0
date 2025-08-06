@@ -431,7 +431,7 @@ function AdminDashboard() {
       delete (window as any).refreshAdminCheckins;
       delete (window as any).refreshAdminDashboard;
     };
-  }, [fetchTodayCheckins, fetchStats]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 pb-24">
