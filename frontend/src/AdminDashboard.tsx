@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 
@@ -48,6 +48,9 @@ function AdminDashboard() {
   // Loading states
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [newCheckinsCount, setNewCheckinsCount] = useState(0);
+  
+  // Refs for outside click detection
+  const tableRef = useRef<HTMLDivElement>(null);
 
   // Define functions before useEffect
   const fetchTodayCheckins = useCallback(async () => {
@@ -314,6 +317,9 @@ function AdminDashboard() {
   const toggleFamilyMemberSelection = async (checkinId: string, memberCheckinId: string, memberId: string, memberName: string, timestamp: string) => {
     const isCurrentlySelected = selectedFamilyMembers[checkinId]?.has(memberCheckinId);
     
+    // Preserve expanded state during the operation
+    const currentExpandedState = new Set(expandedFamilies);
+    
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       
@@ -408,6 +414,9 @@ function AdminDashboard() {
       }
     } catch (error) {
       console.error('Error toggling member selection:', error);
+    } finally {
+      // Restore expanded state to prevent dropdown from closing
+      setExpandedFamilies(currentExpandedState);
     }
   };
 
@@ -459,6 +468,31 @@ function AdminDashboard() {
       delete (window as any).refreshAdminStats;
       delete (window as any).refreshAdminCheckins;
       delete (window as any).refreshAdminDashboard;
+    };
+  }, []);
+
+  // Handle outside click and escape key to close expanded families
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
+        // Clicked outside the table - close all expanded families
+        setExpandedFamilies(new Set());
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // Escape key pressed - close all expanded families
+        setExpandedFamilies(new Set());
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
   }, []);
 
@@ -685,7 +719,7 @@ function AdminDashboard() {
               Live
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" ref={tableRef}>
             {todayCheckins.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-white/70 text-lg">No check-ins yet today</p>
@@ -768,6 +802,7 @@ function AdminDashboard() {
                               <tr 
                                 key={`family-member-${checkin.checkin_id}-${member.id}`}
                                 className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <td className="py-2 px-4 text-white/70 text-sm pl-8">
                                 </td>
@@ -776,13 +811,17 @@ function AdminDashboard() {
                                     <input
                                       type="checkbox"
                                       checked={isCheckedIn}
-                                      onChange={() => toggleFamilyMemberSelection(
-                                        checkin.checkin_id, 
-                                        memberCheckin?.checkin_id || '',
-                                        member.id,
-                                        member.name,
-                                        memberCheckin?.timestamp || new Date().toISOString()
-                                      )}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        toggleFamilyMemberSelection(
+                                          checkin.checkin_id, 
+                                          memberCheckin?.checkin_id || '',
+                                          member.id,
+                                          member.name,
+                                          memberCheckin?.timestamp || new Date().toISOString()
+                                        );
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
                                       className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
                                     />
                                     {member.name}
