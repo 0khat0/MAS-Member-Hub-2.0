@@ -789,13 +789,7 @@ function AdminDashboard() {
                                   </div>
                                 </td>
                                 <td className="py-2 px-4 text-white/70 text-sm pl-8">
-                                  <a 
-                                    href={`mailto:${member.email}`}
-                                    className="text-blue-400 hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {member.email}
-                                  </a>
+                                  <span className="text-white/40">—</span>
                                 </td>
                               </tr>
                             );
