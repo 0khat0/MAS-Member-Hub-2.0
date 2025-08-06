@@ -106,13 +106,28 @@ function AdminDashboard() {
   }, []);
 
   const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'America/Toronto'
-    });
+    try {
+      // Log the received timestamp for debugging
+      console.log('Received timestamp:', timestamp);
+      
+      const date = new Date(timestamp);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid timestamp received:', timestamp);
+        return 'Invalid Time';
+      }
+      
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/Toronto'
+      });
+    } catch (error) {
+      console.error('Error formatting timestamp:', timestamp, error);
+      return 'Error';
+    }
   };
   
 
