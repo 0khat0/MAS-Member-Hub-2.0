@@ -135,7 +135,7 @@ function AdminDashboard() {
   
 
 
-  const fetchStats = async () => {
+  const fetchStats = async (retryCount = 0) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${API_URL}/admin/checkins/stats`);
@@ -143,6 +143,10 @@ function AdminDashboard() {
       if (!response.ok) {
         if (response.status === 429) {
           console.warn('Rate limited. Please wait before refreshing stats.');
+          // Retry after delay if we haven't exceeded max retries
+          if (retryCount < 2) {
+            setTimeout(() => fetchStats(retryCount + 1), 3000 + (retryCount * 2000));
+          }
           return;
         }
         console.error('Error fetching stats:', response.status, response.statusText);
@@ -153,6 +157,10 @@ function AdminDashboard() {
       setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Retry on network errors if we haven't exceeded max retries
+      if (retryCount < 2) {
+        setTimeout(() => fetchStats(retryCount + 1), 3000 + (retryCount * 2000));
+      }
     }
   };
 
@@ -403,12 +411,12 @@ function AdminDashboard() {
   // Authentication check removed - admin access is now open
 
   useEffect(() => {
-    // Initial fetch with delays to prevent rate limiting
+    // Initial fetch with longer delays to prevent rate limiting
     const loadData = async () => {
       await fetchTodayCheckins();
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
       await fetchStats();
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
       await fetchMembers();
     };
     
