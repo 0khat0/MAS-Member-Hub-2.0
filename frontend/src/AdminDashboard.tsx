@@ -47,6 +47,7 @@ function AdminDashboard() {
 
   // Loading states
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newCheckinsCount, setNewCheckinsCount] = useState(0);
 
   // Define functions before useEffect
   const fetchTodayCheckins = useCallback(async () => {
@@ -73,6 +74,19 @@ function AdminDashboard() {
         console.error('Invalid data format received:', data);
         setTodayCheckins([]);
         return;
+      }
+      
+      // Detect new check-ins by comparing with current state
+      const currentCheckinIds = todayCheckins.map(c => c.checkin_id);
+      const newCheckinIds = data.filter((checkin: DailyCheckin) => 
+        !currentCheckinIds.includes(checkin.checkin_id)
+      );
+      
+      // Show notification for new check-ins (but not on initial load)
+      if (currentCheckinIds.length > 0 && newCheckinIds.length > 0) {
+        setNewCheckinsCount(newCheckinIds.length);
+        // Clear the notification after 3 seconds
+        setTimeout(() => setNewCheckinsCount(0), 3000);
       }
       
       setTodayCheckins(data);
@@ -423,15 +437,27 @@ function AdminDashboard() {
       await fetchStats();
     };
     
-    // Remove auto-refresh to prevent rate limiting
-    // Only refresh manually or when triggered by QR scans
+    // Auto-refresh check-ins every 3 seconds for near real-time updates
+    const refreshInterval = setInterval(async () => {
+      try {
+        await fetchTodayCheckins();
+        // Refresh stats less frequently (every 5th refresh = ~15 seconds)
+        if (Math.random() > 0.8) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await fetchStats();
+        }
+      } catch (error) {
+        console.warn('Auto-refresh failed:', error);
+      }
+    }, 3000); // 3 seconds
     
     return () => {
+      clearInterval(refreshInterval);
       delete (window as any).refreshAdminStats;
       delete (window as any).refreshAdminCheckins;
       delete (window as any).refreshAdminDashboard;
     };
-  }, []);
+  }, [fetchTodayCheckins, fetchStats]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 pb-24">
@@ -442,42 +468,7 @@ function AdminDashboard() {
             <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
             <p className="text-white/60">Manage members and monitor check-ins</p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={async () => {
-                setIsRefreshing(true);
-                try {
-                  await fetchTodayCheckins();
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  await fetchStats();
-                } finally {
-                  setIsRefreshing(false);
-                }
-              }}
-              disabled={isRefreshing}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
-            >
-              {isRefreshing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  🔄 Refresh
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setShowMembersModal(true);
-                fetchMembers();
-              }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              👥 Member List
-            </button>
-          </div>
+
         </div>
 
         {/* Scanner Navigation */}
@@ -674,7 +665,25 @@ function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <h2 className="text-xl font-semibold text-white mb-6">Today's Check-ins</h2>
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-xl font-semibold text-white">Today's Check-ins</h2>
+            {newCheckinsCount > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium"
+              >
+                +{newCheckinsCount} new
+              </motion.div>
+            )}
+            {isRefreshing && (
+              <div className="text-white/50 text-sm flex items-center gap-1">
+                <div className="w-3 h-3 border border-white/30 border-t-white/70 rounded-full animate-spin"></div>
+                Updating...
+              </div>
+            )}
+          </div>
           <div className="overflow-x-auto">
             {todayCheckins.length === 0 ? (
               <div className="text-center py-8">
