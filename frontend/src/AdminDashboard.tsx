@@ -107,10 +107,13 @@ function AdminDashboard() {
 
   const formatTime = (timestamp: string) => {
     try {
-      // Log the received timestamp for debugging
-      console.log('Received timestamp:', timestamp);
+      // Clean up malformed timestamp: remove 'Z' if there's already a timezone offset
+      let cleanTimestamp = timestamp;
+      if (timestamp.includes('+') && timestamp.endsWith('Z')) {
+        cleanTimestamp = timestamp.slice(0, -1); // Remove the trailing 'Z'
+      }
       
-      const date = new Date(timestamp);
+      const date = new Date(cleanTimestamp);
       
       // Check if date is valid
       if (isNaN(date.getTime())) {
