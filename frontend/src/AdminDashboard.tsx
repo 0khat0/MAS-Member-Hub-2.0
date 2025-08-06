@@ -688,7 +688,7 @@ function AdminDashboard() {
           <div className="overflow-x-auto">
             {todayCheckins.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-white/70 text-lg">No home page visits yet today</p>
+                <p className="text-white/70 text-lg">No check-ins yet today</p>
               </div>
             ) : (
               <table className="w-full">
@@ -766,7 +766,7 @@ function AdminDashboard() {
                             
                             return (
                               <tr 
-                                key={`${member.id}-${memberCheckin?.checkin_id || 'no-checkin'}`}
+                                key={`family-member-${checkin.checkin_id}-${member.id}`}
                                 className="border-b border-white/5 bg-purple-900/10 hover:bg-purple-900/20 transition-colors"
                               >
                                 <td className="py-2 px-4 text-white/70 text-sm pl-8">
