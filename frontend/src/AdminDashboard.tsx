@@ -590,7 +590,7 @@ function AdminDashboard() {
                     autoFocus
                   />
                 </div>
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto">
                   {isLoadingMembers ? (
                     <div className="flex justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
@@ -598,12 +598,12 @@ function AdminDashboard() {
                   ) : (
                     <div className="min-h-0 flex-1">
                       <table className="w-full">
-                        <thead className="sticky top-0 bg-gray-900 z-10">
+                        <thead className="sticky top-0 bg-gray-900 z-10 shadow-sm">
                           <tr className="border-b border-white/10">
-                            <th className="text-left py-3 px-4 text-white/70 font-medium">Name</th>
+                            <th className="text-left py-3 px-10 text-white/70 font-medium">Name</th>
                             <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
                             <th className="text-left py-3 px-4 text-white/70 font-medium">Joined</th>
-                            <th className="text-left py-3 px-4 text-white/70 font-medium">Actions</th>
+                            <th className="text-left py-3 px-10 text-white/70 font-medium">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -615,7 +615,7 @@ function AdminDashboard() {
                               key={member.id}
                               className="border-b border-white/5 hover:bg-white/5 transition-colors"
                             >
-                              <td className="py-3 px-4 text-white/90 font-medium">
+                              <td className="py-3 px-10 text-white/90 font-medium">
                                 {editingMember?.id === member.id ? (
                                   <input
                                     type="text"
@@ -648,7 +648,7 @@ function AdminDashboard() {
                                 )}
                               </td>
                               <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-10">
                                 {editingMember?.id === member.id ? (
                                   <div className="flex gap-2">
                                     <button
