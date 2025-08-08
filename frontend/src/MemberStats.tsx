@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
 
@@ -57,6 +58,12 @@ function MemberStats({ memberId }: Props) {
   const [selectedMemberId, setSelectedMemberId] = useState<string>(memberId);
   const [isFamily, setIsFamily] = useState(false);
   const [familyFetchComplete, setFamilyFetchComplete] = useState(false);
+  
+  // Add member modal states
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [addMemberError, setAddMemberError] = useState('');
 
   // Declare selectedMember early to prevent initialization errors
   const selectedMember = familyMembers.find(m => m.id === selectedMemberId);
@@ -494,6 +501,81 @@ function MemberStats({ memberId }: Props) {
     }
   };
 
+  const handleAddMember = async () => {
+    if (!newMemberName.trim()) {
+      setAddMemberError('Member name is required');
+      return;
+    }
+
+    setIsAddingMember(true);
+    setAddMemberError('');
+
+    try {
+      const API_URL = getApiUrl();
+      
+      // Get the family email
+      let familyEmail = localStorage.getItem('member_email');
+      
+      // If not in family mode, get email from the current member
+      if (!familyEmail && selectedMember) {
+        familyEmail = selectedMember.email;
+      }
+      
+      if (!familyEmail) {
+        setAddMemberError('Unable to determine family email');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/family/add-members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: familyEmail,
+          new_members: [newMemberName.trim()]
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update family members with the new complete list
+        if (result.all_family_members) {
+          setFamilyMembers(result.all_family_members);
+          
+          // Update localStorage
+          const memberNames = result.all_family_members.map((m: any) => m.name);
+          localStorage.setItem('family_members', JSON.stringify(memberNames));
+          
+          // Switch to family mode if not already
+          if (!isFamily) {
+            setIsFamily(true);
+            localStorage.setItem('member_email', familyEmail);
+          }
+        }
+        
+        // Close modal and reset form
+        setShowAddMemberModal(false);
+        setNewMemberName('');
+        setAddMemberError('');
+        
+        // Trigger admin dashboard refresh to update member lists
+        if ((window as any).refreshAdminDashboard) {
+          (window as any).refreshAdminDashboard();
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        setAddMemberError(errorData.detail || 'Failed to add member');
+      }
+    } catch (error) {
+      console.error('Error adding member:', error);
+      setAddMemberError(error instanceof Error ? error.message : 'Network error');
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
   // Load goal from localStorage when component mounts or selected member changes
   useEffect(() => {
     console.log('🔍 Goal Loading Effect Triggered:', {
@@ -685,14 +767,16 @@ function MemberStats({ memberId }: Props) {
             );
           })()}
         </div>
-        {/* Family Members Section (only if family) */}
-        {isFamily && familyMembers.length > 1 && (
+        {/* Family Members Section (show if there are family members OR for individual profiles to allow adding) */}
+        {familyMembers.length >= 1 || (!isFamily && stats) ? (
           <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-lg">👨‍👩‍👧‍👦</span>
               </div>
-              <h2 className="text-2xl font-extrabold text-white">Family Members</h2>
+              <h2 className="text-2xl font-extrabold text-white">
+                {isFamily || familyMembers.length > 1 ? 'Family Members' : 'Add Family Members'}
+              </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {familyMembers.filter(m => !m.is_deleted).map((member) => (
@@ -730,9 +814,19 @@ function MemberStats({ memberId }: Props) {
                   </button>
                 </div>
               ))}
+              {/* Add Member Button */}
+              <button
+                onClick={() => setShowAddMemberModal(true)}
+                className="rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/30 text-white/60 hover:text-white hover:border-purple-500 hover:bg-purple-800/20 transition-all duration-200 px-4 py-3 flex flex-col items-center justify-center gap-2 min-h-[80px]"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span className="text-sm font-medium">Add Member</span>
+              </button>
             </div>
           </div>
-        )}
+        ) : null}
         {/* Profile Section */}
         <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
           <div className="mb-6 flex items-center gap-3">
@@ -959,6 +1053,74 @@ function MemberStats({ memberId }: Props) {
           </div>
         </div>
       </div>
+      
+      {/* Add Member Modal */}
+      <AnimatePresence>
+        {showAddMemberModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAddMemberModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gray-900 rounded-xl shadow-xl w-full max-w-md"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-white/10">
+                <h2 className="text-xl font-semibold text-white">Add Family Member</h2>
+              </div>
+              
+              <div className="p-6">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-white/70 mb-2">
+                    Member Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter member name"
+                    autoFocus
+                  />
+                </div>
+                
+                {addMemberError && (
+                  <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg">
+                    <p className="text-red-300 text-sm">{addMemberError}</p>
+                  </div>
+                )}
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowAddMemberModal(false);
+                      setNewMemberName('');
+                      setAddMemberError('');
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
+                    disabled={isAddingMember}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddMember}
+                    disabled={isAddingMember || !newMemberName.trim()}
+                    className="flex-1 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors duration-200"
+                  >
+                    {isAddingMember ? 'Adding...' : 'Add Member'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

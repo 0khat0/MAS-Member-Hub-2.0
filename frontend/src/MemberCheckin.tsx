@@ -44,6 +44,7 @@ function MemberCheckin() {
   // Track which family members are not checked in for the current period
   const [notCheckedInMembers, setNotCheckedInMembers] = useState<string[]>([]);
   const [checkinStatusLoading, setCheckinStatusLoading] = useState(false);
+  const [showLoginInfo, setShowLoginInfo] = useState(false);
 
   // Helper to handle name changes
   const handleFamilyNameChange = (idx: number, value: string) => {
@@ -248,7 +249,7 @@ function MemberCheckin() {
                     }`}
                     onClick={() => setCheckinByName(true)}
                   >
-                    Sign In
+                    Log In
                   </button>
                 </div>
              </motion.div>
@@ -739,10 +740,20 @@ function MemberCheckin() {
                 <div className="glass-card space-y-6 p-6">
                   {message && (<div className="text-red-400 text-center font-semibold mb-2">{message}</div>)}
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                    <label className="block text-sm font-medium text-white/80 mb-2">Full Name</label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-medium text-white/80">Full Name</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginInfo(true)}
+                        className="w-4 h-4 rounded-full bg-white/20 text-white/70 hover:bg-white/30 hover:text-white transition-colors duration-200 flex items-center justify-center text-xs font-medium"
+                        title="Login help"
+                      >
+                        ?
+                      </button>
+                    </div>
                     <input 
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                      placeholder="Enter your full name" 
+                      placeholder="Enter member full name" 
                       type="text" 
                       value={formName} 
                       onChange={e => setFormName(e.target.value)} 
@@ -771,16 +782,13 @@ function MemberCheckin() {
                        </button>
                      </div>
                    ))}
-                  <button type="button" className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors duration-200" onClick={addFamilyMember}>
-                    + Add Family Member
-                  </button>
                                      <motion.button
                      className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
                      whileHover={{ scale: 1.02 }}
                      whileTap={{ scale: 0.98 }}
                      type="submit"
                    >
-                     Sign In
+                     Log In
                    </motion.button>
                 </div>
               </motion.form>
@@ -834,6 +842,65 @@ function MemberCheckin() {
         </AnimatePresence>
 
         {/* Member Stats (moved to Profile page) */}
+        
+        {/* Login Info Modal */}
+        <AnimatePresence>
+          {showLoginInfo && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowLoginInfo(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-gray-900 rounded-xl shadow-xl w-full max-w-md border border-gray-700"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="p-6 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">Login Help</h2>
+                    <button
+                      onClick={() => setShowLoginInfo(false)}
+                      className="text-white/60 hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-white font-medium mb-2">👤 For Individuals</h3>
+                      <p className="text-white/70 text-sm">
+                        Enter your full name as registered in the system.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-white font-medium mb-2">👥 For Families</h3>
+                      <p className="text-white/70 text-sm">
+                        If you're part of a family membership, just enter <strong>any one name</strong> from your family to log in.
+                      </p>
+                    </div>
+                    
+                    <div className="bg-blue-900/30 border border-blue-600/50 rounded-lg p-3">
+                      <p className="text-blue-300 text-sm">
+                        💡 <strong>Tip:</strong> Use the exact spelling of the name as it appears in your membership.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
