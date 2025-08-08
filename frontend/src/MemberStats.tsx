@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern } from './utils';
+import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern, getDailyMuayThaiMessage } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
 
 interface MemberStats {
@@ -746,6 +746,29 @@ function MemberStats({ memberId }: Props) {
 
   const percent = Math.round((weeklyCheckins / goal) * 100);
 
+  // Theming hook for the Daily Message ribbon
+  const isGoalAchieved = weeklyCheckins >= goal;
+  const isComeback = weeklyCheckins === 0 || (stats?.current_streak ?? 0) === 0;
+  const isHotStreak = (stats?.current_streak ?? 0) >= 7;
+
+  // Gradient/Glow themes (kept as static literals so Tailwind can include them)
+  const gradientDefault = 'bg-gradient-to-r from-red-600/15 via-pink-500/10 to-purple-600/15';
+  const gradientGold = 'bg-gradient-to-r from-amber-400/15 via-orange-500/10 to-yellow-500/15';
+  const gradientTeal = 'bg-gradient-to-r from-teal-500/15 via-cyan-500/10 to-blue-500/15';
+
+  const radialDefault = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(239,68,68,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(147,51,234,0.25),transparent_60%)]';
+  const radialGold = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(250,204,21,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(245,158,11,0.28),transparent_60%)]';
+  const radialTeal = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(20,184,166,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(59,130,246,0.28),transparent_60%)]';
+
+  const dropShadowDefault = 'filter drop-shadow-[0_0_22px_rgba(239,68,68,0.25)]';
+  const dropShadowGold = 'filter drop-shadow-[0_0_24px_rgba(250,204,21,0.25)]';
+  const dropShadowTeal = 'filter drop-shadow-[0_0_24px_rgba(34,211,238,0.22)]';
+
+  const ribbonGradient = isGoalAchieved || isHotStreak ? gradientGold : isComeback ? gradientTeal : gradientDefault;
+  const ribbonRadial = isGoalAchieved || isHotStreak ? radialGold : isComeback ? radialTeal : radialDefault;
+  const ribbonShadow = isGoalAchieved || isHotStreak ? dropShadowGold : isComeback ? dropShadowTeal : dropShadowDefault;
+  const ribbonEmoji = isGoalAchieved || isHotStreak ? '🏆' : isComeback ? '💫' : '🥊';
+
   return (
     <div className="min-h-screen w-full bg-gray-900 font-poppins overflow-x-hidden">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -767,6 +790,48 @@ function MemberStats({ memberId }: Props) {
             );
           })()}
         </div>
+        {/* Daily Message – floating ribbon with subtle shimmer */}
+        <motion.div
+          aria-label="Daily Message"
+          className="relative mx-auto -mt-2 mb-6 max-w-3xl"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          <motion.div
+            className={`relative rounded-full px-6 py-3 w-full flex items-center gap-3 ${ribbonGradient} backdrop-blur overflow-hidden ${ribbonShadow}`}
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            {/* Soft radial glow behind, conforms to rounded pill */}
+            <div className={`pointer-events-none absolute -inset-8 rounded-[999px] ${ribbonRadial} opacity-40 blur-2xl -z-10`} />
+            {/* Shimmer sweep */}
+            <motion.div
+              className="pointer-events-none absolute inset-0 opacity-10 rounded-full"
+              initial={{ x: '-100%' }}
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 2.2, repeat: Infinity, repeatType: 'loop' }}
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)' }}
+            />
+
+            {/* Icon */}
+            <motion.span
+              className="text-2xl select-none"
+              animate={{ rotate: [0, -8, 8, 0] }}
+              transition={{ duration: 3.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+              role="img"
+              aria-hidden="true"
+            >
+              {ribbonEmoji}
+            </motion.span>
+
+            <div className="flex-1">
+              <div className="text-white text-lg font-semibold leading-snug text-center md:text-left">
+                {getDailyMuayThaiMessage()}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
         {/* Family Members Section (show if there are family members OR for individual profiles to allow adding) */}
         {familyMembers.length >= 1 || (!isFamily && stats) ? (
           <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
@@ -999,16 +1064,17 @@ function MemberStats({ memberId }: Props) {
                 <span className="text-3xl text-yellow-400">🏋️‍♂️</span>
                 <span className="text-lg font-bold text-white">This Week</span>
               </div>
-              <div className="text-4xl font-extrabold text-white mb-1">{weeklyCheckins} <span className="text-lg font-normal">/ {goal}</span></div>
-              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden my-2">
+              <div className="text-5xl font-extrabold text-white mb-2 leading-none">{weeklyCheckins} <span className="text-2xl font-normal align-baseline">/ {goal}</span></div>
+              <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden my-2">
                 <div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.min((weeklyCheckins / goal) * 100, 100)}%` }} />
               </div>
-              <div className="text-xs text-white/60">{percent}% of weekly goal</div>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="text-sm text-white/60">{percent}% of weekly goal</div>
+              <div className="flex items-center gap-3 mt-4">
                 <button
                   type="button"
                   onClick={() => setGoal(Math.max(1, goal - 1))}
-                  className="w-7 h-7 rounded-full bg-gray-600 hover:bg-gray-500 text-white font-bold text-lg flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label="Decrease weekly goal"
+                  className="w-9 h-9 rounded-full bg-gray-600 hover:bg-gray-500 text-white font-bold text-xl flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
                   disabled={goal <= 1}
                 >
                   -
@@ -1028,13 +1094,15 @@ function MemberStats({ memberId }: Props) {
                     const clampedValue = Math.max(1, Math.min(7, value));
                     setGoal(clampedValue);
                   }}
-                  className="w-12 px-2 py-1 rounded bg-gray-700 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 text-center text-sm font-semibold"
+                  aria-label="Weekly goal"
+                  className="w-16 h-9 px-3 py-1.5 rounded-md bg-gray-700 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 text-center text-base font-semibold"
                   style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
                 />
                 <button
                   type="button"
                   onClick={() => setGoal(Math.min(7, goal + 1))}
-                  className="w-7 h-7 rounded-full bg-gray-600 hover:bg-gray-500 text-white font-bold text-lg flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label="Increase weekly goal"
+                  className="w-9 h-9 rounded-full bg-gray-600 hover:bg-gray-500 text-white font-bold text-xl flex items-center justify-center transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
                   disabled={goal >= 7}
                 >
                   +

@@ -37,6 +37,33 @@ export function getEasternDayOfWeek(date: Date = new Date()): string {
   });
 }
 
+// Daily Muay Thai message helper (rotates by day of year in Eastern time)
+export function getDailyMuayThaiMessage(): string {
+  const messages = [
+    "Go smash those pads!",
+    "Unleash your inner warrior!",
+    "Keep your guard up and your spirit higher!",
+    "Every round makes you stronger!",
+    "Train hard, fight easy!",
+    "Respect. Discipline. Power.",
+    "Push your limits today!",
+    "Channel your energy into every strike!",
+    "Stay sharp, stay humble!",
+    "Victory is earned in the gym!",
+    "Let your kicks fly!",
+    "Muay Thai: Art of Eight Limbs!",
+    "Breathe, focus, conquer!",
+    "You are your only competition!",
+    "Make every session count!"
+  ];
+  const now = getEasternTime();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const oneDayMs = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDayMs);
+  return messages[dayOfYear % messages.length];
+}
+
 export function getMondayOfCurrentWeekEastern(date: Date = new Date()): Date {
   const torontoDate = new Date(date.toLocaleString("en-US", { timeZone: "America/Toronto" }));
   const day = torontoDate.getDay();
