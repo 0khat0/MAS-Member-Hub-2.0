@@ -748,26 +748,25 @@ function MemberStats({ memberId }: Props) {
 
   // Theming hook for the Daily Message ribbon
   const isGoalAchieved = weeklyCheckins >= goal;
-  const isComeback = weeklyCheckins === 0 || (stats?.current_streak ?? 0) === 0;
-  const isHotStreak = (stats?.current_streak ?? 0) >= 7;
+  const isHotStreak = (stats?.current_streak ?? 0) >= 5;
 
   // Gradient/Glow themes (kept as static literals so Tailwind can include them)
   const gradientDefault = 'bg-gradient-to-r from-red-600/15 via-pink-500/10 to-purple-600/15';
   const gradientGold = 'bg-gradient-to-r from-amber-400/15 via-orange-500/10 to-yellow-500/15';
-  const gradientTeal = 'bg-gradient-to-r from-teal-500/15 via-cyan-500/10 to-blue-500/15';
+  // removed teal theme per request
 
   const radialDefault = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(239,68,68,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(147,51,234,0.25),transparent_60%)]';
   const radialGold = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(250,204,21,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(245,158,11,0.28),transparent_60%)]';
-  const radialTeal = 'bg-[radial-gradient(65%_120%_at_10%_50%,rgba(20,184,166,0.35),transparent_60%),radial-gradient(65%_120%_at_90%_50%,rgba(59,130,246,0.28),transparent_60%)]';
+  // removed teal radial theme per request
 
   const dropShadowDefault = 'filter drop-shadow-[0_0_22px_rgba(239,68,68,0.25)]';
   const dropShadowGold = 'filter drop-shadow-[0_0_24px_rgba(250,204,21,0.25)]';
-  const dropShadowTeal = 'filter drop-shadow-[0_0_24px_rgba(34,211,238,0.22)]';
+  // removed teal shadow per request
 
-  const ribbonGradient = isGoalAchieved || isHotStreak ? gradientGold : isComeback ? gradientTeal : gradientDefault;
-  const ribbonRadial = isGoalAchieved || isHotStreak ? radialGold : isComeback ? radialTeal : radialDefault;
-  const ribbonShadow = isGoalAchieved || isHotStreak ? dropShadowGold : isComeback ? dropShadowTeal : dropShadowDefault;
-  const ribbonEmoji = isGoalAchieved || isHotStreak ? '🏆' : isComeback ? '💫' : '🥊';
+  const ribbonGradient = isGoalAchieved || isHotStreak ? gradientGold : gradientDefault;
+  const ribbonRadial = isGoalAchieved || isHotStreak ? radialGold : radialDefault;
+  const ribbonShadow = isGoalAchieved || isHotStreak ? dropShadowGold : dropShadowDefault;
+  const ribbonEmoji = isGoalAchieved || isHotStreak ? '🏆' : '🥊';
 
   return (
     <div className="min-h-screen w-full bg-gray-900 font-poppins overflow-x-hidden">
