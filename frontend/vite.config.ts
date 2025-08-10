@@ -41,7 +41,7 @@ export default defineConfig({
       manifest: {
         name: 'MAS Academy Member Hub',
         short_name: 'MAS Hub',
-        start_url: '/member',
+        start_url: '/',
         scope: '/',
         display: 'standalone',
         background_color: '#0f1220',
