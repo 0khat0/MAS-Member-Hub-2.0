@@ -917,13 +917,17 @@ function MemberStats({ memberId }: Props) {
                 }
                 
                 if (!editEmail.trim()) {
-                  setEditError('Email is required.');
+                  setEditError('Member email is required.');
+                  return;
+                }
+                if (!/^\S+@\S+\.\S+$/.test(editEmail.trim())) {
+                  setEditError('Please enter a valid member email.');
                   return;
                 }
                 
                 // Validate full name (first and last)
                 if (!/^\s*\S+\s+\S+/.test(editName.trim())) {
-                  setEditError('Please enter your full name (first and last).');
+                  setEditError('Please enter member full name (first and last).');
                   return;
                 }
                 
@@ -938,7 +942,7 @@ function MemberStats({ memberId }: Props) {
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
-                    placeholder="Enter your full name"
+                    placeholder="Enter member full name"
                     required
                   />
                 </div>
@@ -949,7 +953,7 @@ function MemberStats({ memberId }: Props) {
                     value={editEmail}
                     onChange={e => setEditEmail(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
-                    placeholder="Enter your email"
+                    placeholder="Enter member email"
                     required
                   />
                 </div>

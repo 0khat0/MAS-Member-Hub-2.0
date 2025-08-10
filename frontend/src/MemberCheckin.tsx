@@ -272,13 +272,20 @@ function MemberCheckin() {
                     // Validate inputs
                     if (!formName.trim()) {
                       setStatus("error");
-                      setMessage("Please enter your name.");
+                      setMessage("Please enter member full name.");
                       return;
                     }
 
                     if (!/^\s*\S+\s+\S+/.test(formName.trim())) {
                       setStatus("error");
-                      setMessage("Please enter your full name (first and last).");
+                      setMessage("Please enter member full name (first and last).");
+                      return;
+                    }
+
+                    // Email format quick check
+                    if (!/^\S+@\S+\.\S+$/.test(formEmail.trim())) {
+                      setStatus("error");
+                      setMessage("Please enter a valid member email.");
                       return;
                     }
 
@@ -362,7 +369,7 @@ function MemberCheckin() {
                   
                   for (const name of allNames) {
                     if (!/^\s*\S+\s+\S+/.test(name.trim())) {
-                      setMessage("Please enter a full name (first and last) for each member.");
+                      setMessage("Please enter member full name (first and last) for each member.");
                       return;
                     }
                   }
@@ -527,7 +534,7 @@ function MemberCheckin() {
                     <label className="block text-sm font-medium text-white/80 mb-2">Full Name</label>
                     <input 
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                      placeholder="Enter your full name" 
+                      placeholder="Enter member full name" 
                       type="text" 
                       value={formName} 
                       onChange={e => setFormName(e.target.value)} 
@@ -540,7 +547,7 @@ function MemberCheckin() {
                      <motion.div key={idx} className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
                        <input 
                          className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                         placeholder="Enter family member's full name" 
+                          placeholder="Enter member full name" 
                          type="text" 
                          value={name} 
                          onChange={e => handleFamilyNameChange(idx, e.target.value)} 
@@ -570,10 +577,10 @@ function MemberCheckin() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <label className="block text-sm font-medium text-white/80 mb-2">Email Address</label>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Member Email</label>
                     <input
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200"
-                      placeholder="Enter your email"
+                      placeholder="Enter member email"
                       type="email"
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
@@ -741,7 +748,7 @@ function MemberCheckin() {
                   {message && (<div className="text-red-400 text-center font-semibold mb-2">{message}</div>)}
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <label className="block text-sm font-medium text-white/80">Full Name</label>
+                      <label className="block text-sm font-medium text-white/80">Member Full Name</label>
                       <button
                         type="button"
                         onClick={() => setShowLoginInfo(true)}
@@ -765,7 +772,7 @@ function MemberCheckin() {
                      <div key={idx} className="flex items-center gap-3">
                        <input 
                          className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                         placeholder="Enter family member's full name" 
+                          placeholder="Enter member full name" 
                          type="text" 
                          value={name} 
                          onChange={e => handleFamilyNameChange(idx, e.target.value)} 
