@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
@@ -7,6 +7,7 @@ import MemberStats from "./MemberStats";
 import AuthFlow from "./AuthFlow";
 import ProfilePage from "./ProfilePage";
 import { getMemberId, reportIssue } from "./utils";
+import { apiFetch } from "./lib/session";
 
 // Lazy load components for better performance
 const MemberCheckin = lazy(() => import("./MemberCheckin"));
@@ -56,6 +57,7 @@ function App() {
 
 function AppContent() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   // Get validated memberId from localStorage for profile
@@ -67,6 +69,22 @@ function AppContent() {
       window.location.href = `/profile?id=${memberId}`;
     }
   }, [memberId, location.pathname]);
+
+  // If not authenticated, route / and /home to /auth to start email+OTP flow
+  useEffect(() => {
+    const enforceAuth = async () => {
+      if (memberId) return;
+      if (location.pathname === "/" || location.pathname === "/home") {
+        try {
+          const r = await apiFetch('/v1/households/me');
+          if (r.status === 401) navigate('/auth');
+        } catch {
+          navigate('/auth');
+        }
+      }
+    };
+    enforceAuth();
+  }, [location.pathname, memberId, navigate]);
 
   return (
     <div className="bg-gray-900 text-white min-h-screen flex flex-col">

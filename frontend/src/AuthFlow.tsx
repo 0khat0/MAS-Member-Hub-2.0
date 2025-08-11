@@ -22,7 +22,25 @@ export default function AuthFlow() {
     return (
       <div className="max-w-sm mx-auto p-4">
         <h2 className="text-xl font-semibold mb-2">Enter code</h2>
-        <AuthOTP pendingId={pendingId} emailMasked={emailMasked} rawEmail={rawEmail} onVerified={(data) => { setMe(data); setStep('done') }} />
+        <AuthOTP pendingId={pendingId} emailMasked={emailMasked} rawEmail={rawEmail} onVerified={(data) => {
+          setMe(data);
+          // If no members yet, prompt user to create one immediately
+          if (!data.members || data.members.length === 0) {
+            const name = window.prompt('Add your first member. Name:');
+            if (name && name.trim().length > 0) {
+              fetch('/api/v1/households/members', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name: name.trim() })
+              }).then(() => setStep('done')).catch(() => setStep('done'))
+            } else {
+              setStep('done')
+            }
+          } else {
+            setStep('done')
+          }
+        }} />
       </div>
     )
   }

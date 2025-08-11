@@ -12,6 +12,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set.")
 
+# Enforce Postgres for this schema (UUID columns, etc.)
+if DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError(
+        "SQLite is not supported for this project. Set DATABASE_URL to Postgres, e.g. "
+        "postgresql://postgres:postgres@localhost:5432/mas_hub"
+    )
+
 # Database engine with connection pooling
 engine = create_engine(
     DATABASE_URL,
