@@ -164,10 +164,22 @@ function MemberCheckin() {
                         if (!firstId) firstId = m?.id ?? null
                       }
                     }
+                    // Persist session context for profile page
+                    if (otpEmail) localStorage.setItem('member_email', otpEmail)
+                    if (!firstId) {
+                      // Fallback: load household and pick first member id if present
+                      const me = await apiFetch('/v1/households/me')
+                      if (me.ok) {
+                        const data = await me.json()
+                        firstId = data?.members?.[0]?.id ?? null
+                      }
+                    }
                     if (firstId) localStorage.setItem('member_id', firstId)
-                    window.location.href = firstId ? `/profile?id=${firstId}` : '/profile'
+                    window.location.href = firstId
+                      ? `/profile?id=${firstId}`
+                      : `/profile?email=${encodeURIComponent(otpEmail)}`
                   } catch {
-                    window.location.href = '/profile'
+                    window.location.href = `/profile?email=${encodeURIComponent(otpEmail)}`
                   }
                 }}
               />
@@ -314,6 +326,7 @@ function MemberCheckin() {
                     if (!res.ok) throw new Error('start failed')
                     const data = await res.json()
                     setOtpPendingId(data.pendingId); setOtpEmailMasked(data.to); setOtpEmail(formEmail.trim())
+                    return; // Stop here; rest of legacy flow runs after OTP verification
                   } catch { setStatus('error'); setMessage('Failed to start verification. Please try again.'); }
                   
                   // FALLBACK: Original complex logic for existing users
