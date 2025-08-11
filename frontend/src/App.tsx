@@ -5,6 +5,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
 import AuthFlow from "./AuthFlow";
+import HomeAuth from "./HomeAuth";
 import ProfilePage from "./ProfilePage";
 import { getMemberId, reportIssue } from "./utils";
 import { apiFetch } from "./lib/session";
@@ -103,7 +104,7 @@ function AppContent() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    <MemberCheckin />
+                    <HomeAuth />
                   </motion.div>
                 } />
                 <Route path="/auth" element={
@@ -154,7 +155,7 @@ function AppContent() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    <MemberCheckin />
+                    <HomeAuth />
                   </motion.div>
                 } />
               </Routes>
