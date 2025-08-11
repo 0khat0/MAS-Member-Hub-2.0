@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getMemberId, setMemberId, clearMemberData, reportIssue } from './utils';
 import MemberStats from './MemberStats';
+import FamilySwitch from './components/FamilySwitch';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function ProfilePage() {
@@ -266,6 +267,15 @@ function ProfilePage() {
 
       </div>
       
+      {/* Quick family switcher (local switching) */}
+      {memberId && (
+        <div className="max-w-md mx-auto p-3">
+          <FamilySwitch onSelect={(m) => {
+            localStorage.setItem('active_member', JSON.stringify(m));
+            // Keep current page; other components can read active member
+          }} />
+        </div>
+      )}
       <MemberStats memberId={memberId} />
     </div>
   );

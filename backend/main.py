@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
 from time import perf_counter
 from sqlalchemy import text
+import jwt
 
 # UUID validation function
 def is_valid_uuid(uuid_string: str) -> bool:
@@ -150,6 +151,9 @@ async def startup_event():
             CREATE INDEX IF NOT EXISTS idx_member_email_lower ON members (lower(email));
             CREATE INDEX IF NOT EXISTS idx_checkin_member_ts ON checkins (member_id, timestamp);
             CREATE INDEX IF NOT EXISTS idx_member_barcode ON members (barcode);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_households_email_unique ON households (lower(owner_email));
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_members_member_code ON members (member_code);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_households_household_code ON households (household_code);
             """))
             conn.commit()
         logger.info("Database tables created successfully and indexes ensured")
@@ -164,6 +168,36 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# -------------------- OTP Sessions --------------------
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
+JWT_ALG = "HS256"
+SESSION_COOKIE = "mh_session"
+SESSION_MAX_AGE = 60 * 60 * 24 * 30
+
+
+def _create_session_cookie(response: Response, household_id: str):
+    token = jwt.encode({"household_id": household_id, "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        secure=os.getenv("ENVIRONMENT") == "production",
+        samesite="lax",
+        path="/",
+        max_age=SESSION_MAX_AGE,
+    )
+
+
+def _get_household_id_from_request(request: Request) -> Optional[str]:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        return payload.get("household_id")
+    except Exception:
+        return None
 
 # Health check endpoint
 @app.get("/health")
@@ -185,10 +219,160 @@ async def health_check(db: Session = Depends(get_db)):
             content={"status": "unhealthy", "error": str(e)}
         )
 
-# Metrics endpoint
 @app.get("/metrics")
 async def get_metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# -------------------- Auth & Households API (v1) --------------------
+from fastapi import APIRouter
+from pydantic import EmailStr
+router = APIRouter(prefix="/v1")
+
+
+class StartAuthBody(BaseModel):
+    email: EmailStr
+
+
+@router.post("/auth/start")
+def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household
+    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
+    from emails.sender import send_email
+
+    email = str(body.email).strip().lower()
+
+    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
+    if not existing:
+        existing = Household(owner_email=email)
+        db.add(existing)
+        db.flush()
+
+    rl_key = f"{request.client.host}:{email}"
+    if not rate_limit_ok(rl_key):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
+
+    code = generate_otp()
+    existing.email_verification_token_hash = hash_token(code)
+    existing.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
+    db.add(existing)
+    db.commit()
+
+    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
+    send_email(to=email, subject="Your MAS verification code", html=html)
+
+    return {"pendingId": str(existing.id), "to": mask_email(email)}
+
+
+class VerifyAuthBody(BaseModel):
+    pendingId: str
+    code: str
+
+
+@router.post("/auth/verify")
+def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household, Member
+    if not is_valid_uuid(body.pendingId):
+        raise HTTPException(status_code=400, detail="Invalid pendingId")
+
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(body.pendingId))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not household.email_verification_token_hash or not household.email_verification_expires_at:
+        raise HTTPException(status_code=400, detail="No pending verification")
+    if datetime.now(pytz.UTC) > household.email_verification_expires_at:
+        raise HTTPException(status_code=400, detail="Code expired")
+
+    from auth.otp import hash_token
+    if hash_token(body.code.strip()) != household.email_verification_token_hash:
+        raise HTTPException(status_code=401, detail="Invalid code")
+
+    household.email_verified_at = datetime.now(pytz.UTC)
+    household.email_verification_token_hash = None
+    household.email_verification_expires_at = None
+    db.add(household)
+    db.commit()
+
+    _create_session_cookie(response, str(household.id))
+
+    members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+    return {
+        "householdId": str(household.id),
+        "ownerEmail": household.owner_email,
+        "members": [
+            {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+            for m in members
+        ],
+        "householdCode": household.household_code,
+    }
+
+
+@router.get("/households/me")
+def households_me(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household, Member
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    members = db.execute(select(Member).where(Member.household_id == household.id)).scalars().all()
+    return {
+        "householdId": str(household.id),
+        "ownerEmail": household.owner_email,
+        "members": [
+            {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+            for m in members
+        ],
+        "householdCode": household.household_code,
+    }
+
+
+class NewMemberBody(BaseModel):
+    name: str
+
+
+@router.post("/households/members")
+def households_create_member(body: NewMemberBody, request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household, Member
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    m = Member(email=household.owner_email, name=body.name.strip(), household_id=household.id)
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+
+
+class AttachMemberBody(BaseModel):
+    memberCode: str
+    householdCode: str
+
+
+@router.post("/households/attach-member")
+def households_attach_member(body: AttachMemberBody, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household, Member
+    member = db.execute(select(Member).where(Member.member_code == body.memberCode.strip().upper())).scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    household = db.execute(select(Household).where(Household.household_code == body.householdCode.strip().upper())).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=404, detail="Household not found")
+    member.household_id = household.id
+    member.email = household.owner_email
+    db.add(member)
+    db.commit()
+    return {"linked": True}
+
+app.include_router(router)
 
 # Sample data insertion removed - no default members created
 

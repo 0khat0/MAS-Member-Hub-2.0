@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
+import AuthFlow from "./AuthFlow";
 import ProfilePage from "./ProfilePage";
 import { getMemberId, reportIssue } from "./utils";
 
@@ -85,6 +86,16 @@ function AppContent() {
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
                     <MemberCheckin />
+                  </motion.div>
+                } />
+                <Route path="/auth" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <AuthFlow />
                   </motion.div>
                 } />
                 <Route path="/profile" element={
