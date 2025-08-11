@@ -1,11 +1,10 @@
 import { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
 import AuthFlow from "./AuthFlow";
-import HomeAuth from "./HomeAuth";
 import ProfilePage from "./ProfilePage";
 import { getMemberId, reportIssue } from "./utils";
 import { apiFetch } from "./lib/session";
@@ -58,7 +57,6 @@ function App() {
 
 function AppContent() {
   const location = useLocation();
-  const navigate = useNavigate();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   // Get validated memberId from localStorage for profile
@@ -71,21 +69,7 @@ function AppContent() {
     }
   }, [memberId, location.pathname]);
 
-  // If not authenticated, route / and /home to /auth to start email+OTP flow
-  useEffect(() => {
-    const enforceAuth = async () => {
-      if (memberId) return;
-      if (location.pathname === "/" || location.pathname === "/home") {
-        try {
-          const r = await apiFetch('/v1/households/me');
-          if (r.status === 401) navigate('/auth');
-        } catch {
-          navigate('/auth');
-        }
-      }
-    };
-    enforceAuth();
-  }, [location.pathname, memberId, navigate]);
+  // No forced redirect to /auth; OTP is integrated on the home page UI
 
   return (
     <div className="bg-gray-900 text-white min-h-screen flex flex-col">
@@ -104,17 +88,7 @@ function AppContent() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    <HomeAuth />
-                  </motion.div>
-                } />
-                <Route path="/auth" element={
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                  >
-                    <AuthFlow />
+                    <MemberCheckin />
                   </motion.div>
                 } />
                 <Route path="/profile" element={
@@ -155,7 +129,7 @@ function AppContent() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                   >
-                    <HomeAuth />
+                    <MemberCheckin />
                   </motion.div>
                 } />
               </Routes>
