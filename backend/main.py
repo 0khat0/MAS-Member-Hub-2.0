@@ -344,11 +344,22 @@ def households_create_member(body: NewMemberBody, request: Request, db: Session 
     household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
     if not household:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    m = Member(email=household.owner_email, name=body.name.strip(), household_id=household.id)
+    # Generate unique barcode similar to legacy registration
+    barcode = None
+    try:
+        for _ in range(10):
+            candidate = generate_barcode()
+            exists = db.execute(select(Member).where(Member.barcode == candidate)).scalar_one_or_none()
+            if not exists:
+                barcode = candidate
+                break
+    except Exception:
+        pass
+    m = Member(email=household.owner_email, name=body.name.strip(), household_id=household.id, barcode=barcode)
     db.add(m)
     db.commit()
     db.refresh(m)
-    return {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+    return {"id": str(m.id), "name": m.name, "member_code": m.member_code, "barcode": m.barcode}
 
 
 class AttachMemberBody(BaseModel):
