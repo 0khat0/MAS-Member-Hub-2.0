@@ -20,6 +20,9 @@ from database import engine, SessionLocal
 from typing import List, Dict, Optional
 
 from pydantic import BaseModel
+from starlette.middleware.gzip import GZipMiddleware
+from time import perf_counter
+from sqlalchemy import text
 
 # UUID validation function
 def is_valid_uuid(uuid_string: str) -> bool:
@@ -67,6 +70,9 @@ app = FastAPI(
     redoc_url="/redoc" if os.getenv("ENVIRONMENT") == "development" else None,
 )
 
+# Gzip responses over 512 bytes
+app.add_middleware(GZipMiddleware, minimum_size=512)
+
 # Add rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -92,6 +98,7 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = datetime.now()
+    t0 = perf_counter()
     
     # Log request
     logger.info(
@@ -105,6 +112,11 @@ async def log_requests(request: Request, call_next):
     
     # Calculate duration
     duration = (datetime.now() - start_time).total_seconds()
+    # Server-Timing for quick measurement in DevTools
+    try:
+        response.headers["Server-Timing"] = f"app;dur={(perf_counter()-t0)*1000:.0f}"
+    except Exception:
+        pass
     
     # Update metrics
     REQUEST_COUNT.labels(
@@ -131,7 +143,16 @@ async def startup_event():
     try:
         # Create all tables
         models.Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        # Ensure performance indexes (idempotent)
+        with engine.connect() as conn:
+            conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_member_name_lower_trim ON members (lower(trim(name)));
+            CREATE INDEX IF NOT EXISTS idx_member_email_lower ON members (lower(email));
+            CREATE INDEX IF NOT EXISTS idx_checkin_member_ts ON checkins (member_id, timestamp);
+            CREATE INDEX IF NOT EXISTS idx_member_barcode ON members (barcode);
+            """))
+            conn.commit()
+        logger.info("Database tables created successfully and indexes ensured")
     except Exception as e:
         logger.error("Failed to create database tables", error=str(e))
         raise e

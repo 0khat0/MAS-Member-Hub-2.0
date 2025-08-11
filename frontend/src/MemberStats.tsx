@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getCache, setCache } from './lib/cache';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern, getDailyMuayThaiMessage } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
@@ -258,22 +259,28 @@ function MemberStats({ memberId }: Props) {
         localStorage_member_id: localStorage.getItem('member_id')
       });
       if (memberEmail) {
+        const key = `family:${memberEmail}`;
+        const cached = getCache<any[]>(key);
+        if (cached) {
+          setFamilyMembers(cached);
+          setIsFamily((cached || []).length > 1);
+          if (memberId === 'family' && cached && cached.length > 0) {
+            setSelectedMemberId(cached[0].id);
+            setEditName(cached[0].name);
+            setEditEmail(cached[0].email);
+          }
+        }
         const API_URL = getApiUrl();
         try {
           const response = await fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
           if (response.ok) {
             const data = await response.json();
-            console.log('🔍 Debug: Family members from API:', data);
             setFamilyMembers(data || []);
-            // Update localStorage with current family members
+            setCache(key, data, 60_000);
             const memberNames = data.map((m: any) => m.name);
             localStorage.setItem('family_members', JSON.stringify(memberNames));
-            // If only one member, switch to single-user mode
             setIsFamily((data || []).length > 1);
-            
-            // For family mode, also set the first member as selected if no member is selected
             if (memberId === 'family' && data && data.length > 0) {
-              console.log('🔍 Debug: Setting selected member ID to:', data[0].id);
               setSelectedMemberId(data[0].id);
               setEditName(data[0].name);
               setEditEmail(data[0].email);
