@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "./assets/mas-logo.png";
 import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime } from "./utils";
+import InlineAuthGate from "./components/InlineAuthGate";
 
 function getDailyMuayThaiMessage() {
   const messages = [
@@ -133,6 +134,8 @@ function MemberCheckin() {
       />
       {/* Unified Main Content, no extra min-h-screen, no overflow-x-hidden, no extra wrappers */}
       <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-8 space-y-6">
+        {/* Inline OTP Auth overlay for unauthenticated users */}
+        <InlineAuthGate />
         <motion.div
           className="flex flex-row items-center justify-center w-full mb-4 gap-6"
           initial={{ opacity: 0, y: -20 }}
