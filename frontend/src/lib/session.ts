@@ -6,7 +6,9 @@ export function getSessionToken(): string | null {
 }
 
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const url = input.startsWith('/api') ? input : `/api${input.startsWith('/') ? '' : '/'}${input}`
+  const base = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, '') || '/api'
+  const path = input.startsWith('/') ? input : `/${input}`
+  const url = /^https?:\/\//i.test(input) ? input : `${base}${path}`
   return fetch(url, {
     credentials: 'include',
     headers: {

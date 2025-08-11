@@ -183,7 +183,7 @@ def _create_session_cookie(response: Response, household_id: str):
         value=token,
         httponly=True,
         secure=os.getenv("ENVIRONMENT") == "production",
-        samesite="lax",
+        samesite=("none" if os.getenv("ENVIRONMENT") == "production" else "lax"),
         path="/",
         max_age=SESSION_MAX_AGE,
     )
