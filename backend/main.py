@@ -248,6 +248,35 @@ async def debug_barcode_test(db: Session = Depends(get_db)):
             content={"error": str(e)}
         )
 
+# Debug endpoint to test email sending
+@app.post("/debug/email-test")
+async def debug_email_test(request: Request):
+    try:
+        body = await request.json()
+        test_email = body.get("email", "test@example.com")
+        
+        from emails.sender import send_email
+        
+        # Test email send
+        send_email(
+            to=test_email,
+            subject="Test Email from MAS Hub",
+            html="<p>This is a test email to verify Resend configuration.</p>"
+        )
+        
+        return {
+            "message": "Test email sent",
+            "to": test_email,
+            "from": os.getenv("EMAIL_FROM", "Not set"),
+            "resend_key_set": bool(os.getenv("RESEND_API_KEY"))
+        }
+    except Exception as e:
+        logger.error("Email test failed", error=str(e))
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
 @app.get("/metrics")
 async def get_metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
