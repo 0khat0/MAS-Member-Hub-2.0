@@ -52,8 +52,10 @@ function BootstrapGate() {
     (async () => {
       await unregisterSWIfNoSWParam()
       try {
-        // best-effort; if unauthorized, we still render app
-        await bootstrapSession(6000)
+        // Skip session probe on admin routes to avoid banner there
+        if (!location.pathname.startsWith('/admin')) {
+          await bootstrapSession(6000)
+        }
       } catch (e: any) {
         setError(e?.message || 'failed')
       } finally {
@@ -73,7 +75,7 @@ function BootstrapGate() {
 
   return (
     <>
-      {error && (
+      {error && !location.pathname.startsWith('/admin') && (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-3 py-2 rounded z-50">
           Couldn’t start session: {error}. <button onClick={()=>location.reload()} className="underline">Reload</button>
         </div>

@@ -71,17 +71,10 @@ function MemberStats({ memberId }: Props) {
 
   // Immediate goal loading on component mount
   useEffect(() => {
-    console.log('🔍 Component Mount - Loading Goal:', {
-      memberId,
-      isFamily,
-      isValidUUID: isValidUUID(memberId)
-    });
-    
     if (memberId && isValidUUID(memberId)) {
       const memberKey = `checkin_goal_${memberId}`;
       const saved = localStorage.getItem(memberKey);
       const newGoal = saved ? parseInt(saved, 10) : DEFAULT_GOAL;
-      console.log('🔍 Initial Goal Load:', { memberId, memberKey, saved, newGoal });
       setGoal(newGoal);
     }
   }, []); // Empty dependency array - runs only on mount
@@ -105,7 +98,7 @@ function MemberStats({ memberId }: Props) {
             throw new Error(`HTTP ${response.status}`);
           }
 
-          const data = await response.json();
+        const data = await response.json();
           setStats(data);
           setError(null);
 
@@ -265,11 +258,6 @@ function MemberStats({ memberId }: Props) {
   useEffect(() => {
     const fetchAndSyncFamilyMembers = async () => {
       const memberEmail = localStorage.getItem('member_email');
-      console.log('Profile Debug: Starting family fetch', {
-        memberEmail,
-        memberId,
-        localStorage_member_id: localStorage.getItem('member_id')
-      });
       if (memberEmail) {
         const key = `family:${memberEmail}`;
         const cached = getCache<any[]>(key);
@@ -388,15 +376,6 @@ function MemberStats({ memberId }: Props) {
     setIsUpdating(true);
     try {
       const API_URL = getApiUrl();
-      console.log('🔍 Debug: Updating member', {
-        memberIdToUpdate,
-        name,
-        email,
-        API_URL: `${API_URL}/member/${memberIdToUpdate}`,
-        isValidUUID: isValidUUID(memberIdToUpdate),
-        selectedMemberId,
-        familyMembers: familyMembers.map(m => ({ id: m.id, name: m.name, email: m.email }))
-      });
       
       // Validate memberIdToUpdate is a valid UUID
       if (!isValidUUID(memberIdToUpdate)) {
@@ -411,8 +390,7 @@ function MemberStats({ memberId }: Props) {
         body: JSON.stringify({ name, email }),
       });
       
-      console.log('🔍 Debug: Response status', res.status);
-      console.log('🔍 Debug: Response ok', res.ok);
+      
       
       if (res.ok) {
         setEditSuccess('Profile updated successfully!');
@@ -464,12 +442,10 @@ function MemberStats({ memberId }: Props) {
         }
       } else {
         const data = await res.json();
-        console.log('🔍 Debug: Error response', data);
         setEditError(data.detail || 'Failed to update profile.');
       }
     } catch (err) {
       console.error('Update error:', err);
-      console.log('🔍 Debug: Full error object', err);
       setEditError('Network error. Please try again.');
     } finally {
       setIsUpdating(false);
