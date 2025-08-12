@@ -290,6 +290,19 @@ from fastapi import APIRouter
 from pydantic import EmailStr
 router = APIRouter(prefix="/v1")
 
+# Lightweight session probe for app bootstrap
+@router.get("/auth/session")
+def auth_session(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"ok": True, "householdId": str(household.id), "email": household.owner_email}
+
 
 class StartAuthBody(BaseModel):
     email: EmailStr

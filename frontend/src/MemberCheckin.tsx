@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import logo from "./assets/mas-logo.png";
 import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime } from "./utils";
 import AuthOTP from "./components/AuthOTP";
-import { apiFetch } from './lib/session'
+import { apiFetch, bootstrapSession } from './lib/session'
 
 function getDailyMuayThaiMessage() {
   const messages = [
@@ -189,6 +189,8 @@ function MemberCheckin() {
                         if (!firstId) firstId = m?.id ?? null
                       }
                     }
+                    // Confirm cookie arrived before redirect (helps iOS PWAs)
+                    try { await bootstrapSession(4000) } catch {}
                     // Persist session context for profile page
                     if (otpEmail) localStorage.setItem('member_email', otpEmail)
                     if (!firstId) {
