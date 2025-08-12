@@ -28,7 +28,7 @@ export default function FamilySwitch({ onSelect }: Props) {
     })
   }, [])
 
-  if (loading) return <div className="text-sm text-gray-400">Loading...</div>
+  if (loading) return null
   if (!members.length) return <div className="text-sm text-gray-400">No members yet.</div>
 
   return (
