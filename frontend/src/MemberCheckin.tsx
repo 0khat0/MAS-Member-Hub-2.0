@@ -175,38 +175,82 @@ function MemberCheckin() {
                 rawEmail={otpEmail}
                 onVerified={async () => {
                   try {
+                    console.log('OTP verified, starting member creation...')
+                    // Wait a moment for the session cookie to be set
+                    await new Promise(resolve => setTimeout(resolve, 1000))
+                    
                     const names = (isFamily ? [formName, ...familyNames] : [formName])
                       .map(n => (n || '').trim())
                       .filter(n => n.length > 0)
+                    
                     let firstId: string | null = null
-                    for (const n of names) {
-                      const r = await apiFetch('/v1/households/members', {
-                        method: 'POST',
-                        body: JSON.stringify({ name: n })
-                      })
-                      if (r.ok) {
-                        const m = await r.json()
-                        if (!firstId) firstId = m?.id ?? null
+                    
+                    // Create members one by one
+                    console.log('Creating members for names:', names)
+                    for (const name of names) {
+                      try {
+                        console.log('Creating member:', name)
+                        const response = await apiFetch('/v1/households/members', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: name.trim() })
+                        })
+                        
+                        console.log('Member creation response:', response.status, response.ok)
+                        
+                        if (response.ok) {
+                          const memberData = await response.json()
+                          if (!firstId) firstId = memberData.id
+                          console.log('Created member:', memberData)
+                        } else {
+                          const errorText = await response.text()
+                          console.error('Failed to create member:', response.status, errorText)
+                        }
+                      } catch (error) {
+                        console.error('Error creating member:', error)
                       }
                     }
-                    // Confirm cookie arrived before redirect (helps iOS PWAs)
-                    try { await bootstrapSession(4000) } catch {}
-                    // Persist session context for profile page
+                    
+                    // Store session context
                     if (otpEmail) localStorage.setItem('member_email', otpEmail)
-                    if (!firstId) {
-                      // Fallback: load household and pick first member id if present
-                      const me = await apiFetch('/v1/households/me')
-                      if (me.ok) {
-                        const data = await me.json()
-                        firstId = data?.members?.[0]?.id ?? null
-                      }
-                    }
                     if (firstId) localStorage.setItem('member_id', firstId)
-                    window.location.href = firstId
-                      ? `/profile?id=${firstId}`
-                      : `/profile?email=${encodeURIComponent(otpEmail)}`
-                  } catch {
-                    window.location.href = `/profile?email=${encodeURIComponent(otpEmail)}`
+                    
+                    console.log('Members created, firstId:', firstId, 'email:', otpEmail)
+                    
+                    // Verify session is working before redirect
+                    try {
+                      const sessionCheck = await apiFetch('/v1/auth/session')
+                      if (sessionCheck.ok) {
+                        console.log('Session verified, redirecting to profile')
+                        
+                        // Check if we're in a PWA context
+                        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                                     (window.navigator as any).standalone === true
+                        console.log('PWA context detected:', isPWA)
+                        
+                        // Use replace to avoid back button issues on mobile
+                        const profileUrl = firstId 
+                          ? `/profile?id=${firstId}` 
+                          : `/profile?email=${encodeURIComponent(otpEmail)}`
+                        
+                        console.log('Redirecting to:', profileUrl)
+                        window.location.replace(profileUrl)
+                      } else {
+                        throw new Error('Session check failed')
+                      }
+                    } catch (sessionError) {
+                      console.error('Session verification failed:', sessionError)
+                      // Fallback redirect
+                      const profileUrl = firstId 
+                        ? `/profile?id=${firstId}` 
+                        : `/profile?email=${encodeURIComponent(otpEmail)}`
+                      console.log('Fallback redirect to:', profileUrl)
+                      window.location.replace(profileUrl)
+                    }
+                  } catch (error) {
+                    console.error('OTP verification error:', error)
+                    // Emergency fallback
+                    window.location.replace(`/profile?email=${encodeURIComponent(otpEmail)}`)
                   }
                 }}
               />
@@ -247,7 +291,7 @@ function MemberCheckin() {
           >
             <div className="glass-card space-y-6 p-6">
               <div className="text-center">
-                <h3 className="text-xl font-semibold text-white mb-2">👨‍👩‍👧‍👦 Family Home Page</h3>
+                <h3 className="text-xl font-semibold text-white mb-2">Family Home Page</h3>
                 <p className="text-white/70 mb-4">Select which family members are here today:</p>
               </div>
               <div className="space-y-3">
@@ -518,7 +562,7 @@ function MemberCheckin() {
                              : 'text-white/60 hover:text-white'
                          }`}
                        >
-                         👨‍👩‍👧‍👦 Family
+                         Family
                        </button>
                      </div>
                    </motion.div>

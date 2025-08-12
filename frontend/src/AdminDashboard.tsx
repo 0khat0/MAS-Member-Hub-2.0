@@ -726,7 +726,7 @@ function AdminDashboard() {
                         <td className="py-3 px-4 text-white/90 font-medium">
                           <div className="flex items-center gap-2">
                             {checkin.is_family && (
-                              <span className="text-purple-400 text-sm">👨‍👩‍👧‍👦</span>
+                              <span className="text-purple-400 text-sm">👥</span>
                             )}
                             {checkin.name}
                             {checkin.is_family && (

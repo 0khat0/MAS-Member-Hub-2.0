@@ -845,7 +845,7 @@ function MemberStats({ memberId }: Props) {
           <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-lg">👨‍👩‍👧‍👦</span>
+                <span className="text-white text-lg">👥</span>
               </div>
               <h2 className="text-2xl font-extrabold text-white">
                 {isFamily || familyMembers.length > 1 ? 'Family Members' : 'Add Family Members'}
