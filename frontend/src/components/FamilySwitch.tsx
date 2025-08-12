@@ -11,6 +11,7 @@ type Props = {
 export default function FamilySwitch({ onSelect }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const key = 'me:household'
@@ -18,17 +19,44 @@ export default function FamilySwitch({ onSelect }: Props) {
     if (cached) {
       setMembers(cached.members || [])
       setLoading(false)
+      return
     }
+
+    // Add timeout to prevent infinite loading on mobile
+    const timeoutId = setTimeout(() => {
+      setLoading(false)
+      setError('Loading timeout - please refresh')
+    }, 10000) // 10 second timeout
+
     apiFetch('/v1/households/me').then(async (r) => {
-      if (!r.ok) return
-      const data = await r.json()
-      setMembers(data.members || [])
-      setCache(key, data, 60_000)
+      clearTimeout(timeoutId)
+      if (!r.ok) {
+        setError(`Failed to load: ${r.status}`)
+        setLoading(false)
+        return
+      }
+      try {
+        const data = await r.json()
+        setMembers(data.members || [])
+        setCache(key, data, 60_000)
+        setError(null)
+      } catch (e) {
+        setError('Failed to parse response')
+      } finally {
+        setLoading(false)
+      }
+    }).catch((e) => {
+      clearTimeout(timeoutId)
+      console.error('FamilySwitch API error:', e)
+      setError('Network error - please check connection')
       setLoading(false)
     })
+
+    return () => clearTimeout(timeoutId)
   }, [])
 
   if (loading) return null
+  if (error) return <div className="text-sm text-red-400">Error: {error}</div>
   if (!members.length) return <div className="text-sm text-gray-400">No members yet.</div>
 
   return (

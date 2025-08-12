@@ -205,8 +205,15 @@ function MemberStats({ memberId }: Props) {
 
     const fetchStats = async () => {
       try {
+        // Add timeout to prevent infinite loading on mobile
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 15000); // 15 second timeout
+        });
+
         const API_URL = getApiUrl();
-        const response = await fetch(`${API_URL}/member/${memberId}/stats`);
+        const fetchPromise = fetch(`${API_URL}/member/${memberId}/stats`);
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -242,7 +249,11 @@ function MemberStats({ memberId }: Props) {
         }
       } catch (error) {
         console.error('Error fetching member stats:', error);
-        setError('Network error. Please try again.');
+        if (error instanceof Error && error.message === 'Request timeout') {
+          setError('Loading timeout - please check your connection and refresh');
+        } else {
+          setError('Network error. Please try again.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -273,7 +284,14 @@ function MemberStats({ memberId }: Props) {
         }
         const API_URL = getApiUrl();
         try {
-          const response = await fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
+          // Add timeout to prevent infinite loading on mobile
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Family fetch timeout')), 10000); // 10 second timeout
+          });
+
+          const fetchPromise = fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
+          const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+          
           if (response.ok) {
             const data = await response.json();
             setFamilyMembers(data || []);
@@ -286,9 +304,14 @@ function MemberStats({ memberId }: Props) {
               setEditName(data[0].name);
               setEditEmail(data[0].email);
             }
+          } else {
+            console.warn('Family members fetch failed:', response.status);
           }
         } catch (e) {
-          // Ignore errors
+          console.error('Family members fetch error:', e);
+          if (e instanceof Error && e.message === 'Family fetch timeout') {
+            console.warn('Family fetch timed out - using cached data if available');
+          }
         } finally {
           setFamilyFetchComplete(true);
         }

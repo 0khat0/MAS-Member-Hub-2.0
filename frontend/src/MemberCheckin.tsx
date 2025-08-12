@@ -99,7 +99,7 @@ function MemberCheckin() {
         setStatus("success");
         setMessage("Welcome back! Redirecting to your profile...");
         setTimeout(() => {
-          window.location.href = `/profile?email=${encodeURIComponent(savedEmail)}`;
+          window.location.href = `/profile?id=${savedMemberId || ''}&email=${encodeURIComponent(savedEmail)}`;
         }, 1500);
       } else {
         setStatus("register");
@@ -139,6 +139,31 @@ function MemberCheckin() {
       />
       {/* Unified Main Content, no extra min-h-screen, no overflow-x-hidden, no extra wrappers */}
       <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-8 space-y-6">
+        {/* Mobile-friendly error display */}
+        {status === "error" && (
+          <motion.div
+            className="w-full max-w-md"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div className="glass-card p-6 text-center">
+              <div className="text-red-400 text-2xl mb-2">⚠️</div>
+              <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
+              <p className="text-white/70 mb-4">{message}</p>
+              <button
+                onClick={() => {
+                  setStatus("register");
+                  setMessage("");
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* OTP modal only after Create account */}
         {otpPendingId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
