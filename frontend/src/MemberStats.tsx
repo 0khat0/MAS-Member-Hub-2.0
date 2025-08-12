@@ -221,6 +221,7 @@ function MemberStats({ memberId }: Props) {
         const data = await response.json();
         console.log('Member stats data:', data); // Debug log
         console.log('Barcode from API:', data.barcode); // Debug log
+        console.log('Full stats object:', JSON.stringify(data, null, 2)); // Debug log
         setStats(data);
         setEditName(data.name || '');
         setEditEmail(data.email || '');
@@ -782,6 +783,7 @@ function MemberStats({ memberId }: Props) {
         <div className="flex justify-center my-6">
           {(() => {
             let qrData = null;
+            
             if (isFamily && familyMembers.length > 1) {
               // For family, use the email as the shared identifier
               qrData = stats.email;
@@ -789,6 +791,7 @@ function MemberStats({ memberId }: Props) {
               // For individual member, use the barcode
               qrData = stats.barcode;
             }
+            
             return qrData ? (
               <QRCodeGenerator data={qrData} />
             ) : (

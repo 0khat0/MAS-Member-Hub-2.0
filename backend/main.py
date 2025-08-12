@@ -219,6 +219,35 @@ async def health_check(db: Session = Depends(get_db)):
             content={"status": "unhealthy", "error": str(e)}
         )
 
+# Debug endpoint to check barcode functionality
+@app.get("/debug/barcode-test")
+async def debug_barcode_test(db: Session = Depends(get_db)):
+    try:
+        # Test if barcode column exists
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'members' AND column_name = 'barcode'"))
+        barcode_exists = result.fetchone() is not None
+        
+        # Test barcode generation
+        test_barcode = generate_barcode()
+        
+        # Check if any existing members have barcodes
+        members_with_barcodes = db.query(models.Member).filter(models.Member.barcode.isnot(None)).count()
+        total_members = db.query(models.Member).count()
+        
+        return {
+            "barcode_column_exists": barcode_exists,
+            "test_barcode_generated": test_barcode,
+            "members_with_barcodes": members_with_barcodes,
+            "total_members": total_members,
+            "barcode_length": len(test_barcode) if test_barcode else 0
+        }
+    except Exception as e:
+        logger.error("Barcode debug test failed", error=str(e))
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
 @app.get("/metrics")
 async def get_metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
@@ -353,12 +382,20 @@ def households_create_member(body: NewMemberBody, request: Request, db: Session 
             if not exists:
                 barcode = candidate
                 break
-    except Exception:
-        pass
+        if not barcode:
+            logger.error("Failed to generate unique barcode after 10 attempts")
+            raise HTTPException(status_code=500, detail="Failed to generate unique barcode")
+    except Exception as e:
+        logger.error(f"Error generating barcode: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate barcode")
+    
     m = Member(email=household.owner_email, name=body.name.strip(), household_id=household.id, barcode=barcode)
     db.add(m)
     db.commit()
     db.refresh(m)
+    
+    logger.info(f"Created household member with barcode", member_id=str(m.id), barcode=barcode, name=body.name)
+    
     return {"id": str(m.id), "name": m.name, "member_code": m.member_code, "barcode": m.barcode}
 
 
