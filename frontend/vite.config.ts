@@ -20,8 +20,8 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'pages',
-              networkTimeoutSeconds: 2,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
+              networkTimeoutSeconds: 2, // short watchdog so stale shells don't trap
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 30 },
             },
           },
           {
@@ -76,6 +76,9 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
+    },
+    headers: {
+      'Cache-Control': 'no-store' // ensure dev index.html is never cached
     }
   }
 })

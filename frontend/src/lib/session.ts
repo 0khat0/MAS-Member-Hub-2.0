@@ -27,4 +27,17 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   return Promise.race([fetchPromise, timeoutPromise]);
 }
 
+// Session probe with timeout used at app boot and after OTP verify
+export async function bootstrapSession(timeoutMs = 6000): Promise<any> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort('timeout'), timeoutMs)
+  try {
+    const res = await apiFetch('/v1/auth/session', { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 

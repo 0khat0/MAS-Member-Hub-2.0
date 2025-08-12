@@ -85,10 +85,14 @@ app.add_middleware(
 )
 
 # CORS middleware with production settings
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173").strip()
+extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+# Add a placeholder for prod if set
+prod_origin = os.getenv("PROD_FRONTEND_ORIGIN", "").strip()
+allowed_origins = [frontend_origin, *extra_origins, *( [prod_origin] if prod_origin else [] )]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=allowed_origins or ["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -182,8 +186,8 @@ def _create_session_cookie(response: Response, household_id: str):
         key=SESSION_COOKIE,
         value=token,
         httponly=True,
-        secure=os.getenv("ENVIRONMENT") == "production",
-        samesite=("none" if os.getenv("ENVIRONMENT") == "production" else "lax"),
+        secure=os.getenv("ENVIRONMENT") == "production",  # required for iOS PWAs over HTTPS
+        samesite=("none" if os.getenv("ENVIRONMENT") == "production" else "lax"),  # cross-origin + iOS
         path="/",
         max_age=SESSION_MAX_AGE,
     )
@@ -1591,3 +1595,16 @@ async def admin_delete_checkin(request: Request, checkin_id: str, db: Session = 
     }
 
 # Admin authentication removed - admin routes are now open access 
+
+# Lightweight session probe for app bootstrap
+@router.get("/auth/session")
+def auth_session(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"ok": True, "householdId": str(household.id), "email": household.owner_email} 
