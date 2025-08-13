@@ -4,6 +4,7 @@ import { getMemberId, setMemberId, clearMemberData, reportIssue } from './utils'
 import MemberStats from './MemberStats';
 import FamilySwitch from './components/FamilySwitch';
 import { motion, AnimatePresence } from 'framer-motion';
+import InstallPWA from './components/InstallPWA';
 
 function ProfilePage() {
   const [searchParams] = useSearchParams();
@@ -291,6 +292,9 @@ function ProfilePage() {
         </div>
       )}
       <MemberStats memberId={memberId} />
+      
+      {/* Add to Home Screen prompt */}
+      <InstallPWA appName="MAS Hub" />
     </div>
   );
 }

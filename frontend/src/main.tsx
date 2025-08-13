@@ -6,6 +6,19 @@ import { registerSW } from 'virtual:pwa-register'
 import { getSessionOptional } from './lib/session'
 import { getHouseholdId, setHouseholdId, clearAppStorage } from './lib/storage'
 
+// Register custom service worker for PWA functionality
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('SW registered: ', registration);
+      })
+      .catch((registrationError) => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}
+
 // tiny SW debug helpers
 async function unregisterSWIfNoSWParam() {
   if (location.search.includes('nosw')) {
