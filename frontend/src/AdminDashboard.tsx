@@ -590,6 +590,7 @@ function AdminDashboard() {
                           <tr className="border-b border-white/10">
                             <th className="text-left py-3 px-10 text-white/70 font-medium">Name</th>
                             <th className="text-left py-3 px-4 text-white/70 font-medium">Email</th>
+                            <th className="text-left py-3 px-4 text-white/70 font-medium">Account #</th>
                             <th className="text-left py-3 px-4 text-white/70 font-medium">Joined</th>
                             <th className="text-left py-3 px-10 text-white/70 font-medium">Actions</th>
                           </tr>
@@ -635,6 +636,7 @@ function AdminDashboard() {
                                   </a>
                                 )}
                               </td>
+                              <td className="py-3 px-4 text-white/90">{member.household_code || 'N/A'}</td>
                               <td className="py-3 px-4 text-white/90">{formatDate(member.created_at)}</td>
                               <td className="py-3 px-10">
                                 {editingMember?.id === member.id ? (

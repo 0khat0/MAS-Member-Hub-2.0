@@ -40,7 +40,6 @@ class Member(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)  # Soft delete support
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(pytz.UTC), index=True)
     household_id = Column(UUID(as_uuid=True), ForeignKey("households.id", ondelete="SET NULL"), nullable=True, index=True)
-    member_code = Column(String, nullable=True, unique=True, index=True)
     checkins = relationship("Checkin", back_populates="member")
     household = relationship("Household", back_populates="members")
     
@@ -54,26 +53,16 @@ class Member(Base):
 
 # Code generation helpers on insert
 try:
-    from util.codes import gen_code_member, gen_code_household
+    from util.codes import gen_code_household
 except Exception:
     # Fallback to local generation if util not yet imported (e.g., during initial migrations)
     ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    def gen_code_member(n: int = 7):
+    def gen_code_household(n: int = 6):
         import random
         return "".join(random.choice(ALPHABET) for _ in range(n))
-    def gen_code_household(n: int = 5):
-        import random
-        return "MAS-" + "".join(random.choice(ALPHABET) for _ in range(n))
 
 
-@event.listens_for(Member, "before_insert")
-def set_member_code(mapper, connection, target: "Member"):
-    if not target.member_code:
-        # Retry a few times to avoid rare collisions at DB unique constraint
-        for _ in range(5):
-            candidate = gen_code_member(7)
-            target.member_code = candidate
-            break
+
 
 
 @event.listens_for(Household, "before_insert")
@@ -81,7 +70,7 @@ def set_household_code(mapper, connection, target: "Household"):
     if target.owner_email:
         target.owner_email = target.owner_email.strip().lower()
     if not target.household_code:
-        target.household_code = gen_code_household(5)
+        target.household_code = gen_code_household(6)  # 6-character account number
 
 class Checkin(Base):
     __tablename__ = "checkins"

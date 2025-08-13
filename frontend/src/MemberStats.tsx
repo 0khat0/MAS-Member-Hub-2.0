@@ -13,6 +13,7 @@ interface MemberStats {
   name?: string;
   email?: string;
   barcode?: string;
+  household_code?: string;  // Account number for the household
 }
 
 interface FamilyMember {
@@ -911,6 +912,12 @@ function MemberStats({ memberId }: Props) {
             <h2 className="text-2xl font-extrabold text-white">
               {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
             </h2>
+            {/* Display Account Number */}
+            {stats?.household_code && (
+              <div className="text-sm text-white/60 ml-2">
+                Account: {stats.household_code}
+              </div>
+            )}
           </div>
           <div className="w-16 h-1 rounded-full bg-gradient-to-r from-red-500 to-red-700 mb-6" />
           {editMode ? (

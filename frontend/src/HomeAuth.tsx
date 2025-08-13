@@ -5,10 +5,12 @@ import { apiFetch } from './lib/session'
 export default function HomeAuth() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [emailMasked, setEmailMasked] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loginMethod, setLoginMethod] = useState<'email' | 'account'>('email')
 
   useEffect(() => {
     // Try session-based auth: if already logged in, go to profile
@@ -28,14 +30,27 @@ export default function HomeAuth() {
     setError(null)
     setLoading(true)
     try {
-      const res = await apiFetch('/v1/auth/start', {
-        method: 'POST',
-        body: JSON.stringify({ email })
-      })
-      if (!res.ok) throw new Error('failed')
-      const data = await res.json()
-      setPendingId(data.pendingId)
-      setEmailMasked(data.to)
+      if (loginMethod === 'account' && accountNumber.trim()) {
+        // Login with account number
+        const res = await apiFetch('/v1/auth/start-account', {
+          method: 'POST',
+          body: JSON.stringify({ accountNumber: accountNumber.trim() })
+        })
+        if (!res.ok) throw new Error('failed')
+        const data = await res.json()
+        setPendingId(data.pendingId)
+        setEmailMasked(data.to)
+      } else {
+        // Login with email
+        const res = await apiFetch('/v1/auth/start', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        })
+        if (!res.ok) throw new Error('failed')
+        const data = await res.json()
+        setPendingId(data.pendingId)
+        setEmailMasked(data.to)
+      }
     } catch {
       setError('Failed to start. Please try again in a moment.')
     } finally {
@@ -75,26 +90,71 @@ export default function HomeAuth() {
 
   return (
     <div className="max-w-sm mx-auto p-4 space-y-4">
-      <h2 className="text-xl font-semibold text-center">Create account</h2>
+      <h2 className="text-xl font-semibold text-center">Sign In / Create Account</h2>
+      
+      {/* Login Method Toggle */}
+      <div className="flex rounded-lg bg-gray-200 p-1">
+        <button
+          type="button"
+          onClick={() => setLoginMethod('email')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            loginMethod === 'email' 
+              ? 'bg-white text-gray-900 shadow-sm' 
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Email
+        </button>
+        <button
+          type="button"
+          onClick={() => setLoginMethod('account')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            loginMethod === 'account' 
+              ? 'bg-white text-gray-900 shadow-sm' 
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Account #
+        </button>
+      </div>
+
       <form onSubmit={start} className="space-y-3">
-        <input
-          type="text"
-          placeholder="Member name (optional)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded px-3 py-2 text-black"
-        />
-        <input
-          type="email"
-          placeholder="your@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full rounded px-3 py-2 text-black"
-        />
+        {loginMethod === 'email' ? (
+          <>
+            <input
+              type="text"
+              placeholder="Member name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded px-3 py-2 text-black"
+            />
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full rounded px-3 py-2 text-black"
+            />
+          </>
+        ) : (
+          <input
+            type="text"
+            placeholder="Enter your 6-digit account number"
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            maxLength={6}
+            className="w-full rounded px-3 py-2 text-black text-center tracking-widest"
+            required
+          />
+        )}
+        
         {error && <div className="text-red-400 text-sm">{error}</div>}
-        <button disabled={loading || !email} className="bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded px-4 py-2 w-full">
-          {loading ? 'Sending…' : 'Create account'}
+        <button 
+          disabled={loading || (loginMethod === 'email' ? !email : !accountNumber.trim())} 
+          className="bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded px-4 py-2 w-full"
+        >
+          {loading ? 'Sending…' : (loginMethod === 'email' ? 'Create account' : 'Sign in')}
         </button>
       </form>
     </div>

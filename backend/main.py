@@ -156,7 +156,7 @@ async def startup_event():
             CREATE INDEX IF NOT EXISTS idx_checkin_member_ts ON checkins (member_id, timestamp);
             CREATE INDEX IF NOT EXISTS idx_member_barcode ON members (barcode);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_households_email_unique ON households (lower(owner_email));
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_members_member_code ON members (member_code);
+    
             CREATE UNIQUE INDEX IF NOT EXISTS idx_households_household_code ON households (household_code);
             """))
             conn.commit()
@@ -313,6 +313,9 @@ def auth_session(request: Request, db: Session = Depends(get_db)):
 class StartAuthBody(BaseModel):
     email: EmailStr
 
+class StartAuthAccountBody(BaseModel):
+    accountNumber: str
+
 
 @router.post("/auth/start")
 def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_db)):
@@ -345,6 +348,40 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
     return {"pendingId": str(existing.id), "to": mask_email(email)}
 
 
+@router.post("/auth/start-account")
+def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import select
+    from models import Household
+    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
+    from emails.sender import send_email
+    
+    account_number = body.accountNumber.strip().upper()
+    if not account_number:
+        raise HTTPException(status_code=400, detail="Account number is required")
+    
+    # Find household by account number
+    household = db.execute(select(Household).where(Household.household_code == account_number)).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    email = household.owner_email
+    
+    # Rate limiting
+    rl_key = f"{request.client.host}:{email}"
+    if not rate_limit_ok(rl_key):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
+    
+    # Generate and send OTP
+    code = generate_otp()
+    household.email_verification_token_hash = hash_token(code)
+    household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
+    db.add(household)
+    db.commit()
+    
+    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
+    send_email(to=email, subject="Your MAS verification code", html=html)
+    
+    return {"pendingId": str(household.id), "to": mask_email(email)}
 class VerifyAuthBody(BaseModel):
     pendingId: str
     code: str
@@ -385,10 +422,10 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
             "session_token": token,
             "householdId": str(household.id),
             "ownerEmail": household.owner_email,
-            "members": [
-                {"id": str(m.id), "name": m.name, "member_code": m.member_code}
-                for m in members
-            ],
+                    "members": [
+            {"id": str(m.id), "name": m.name}
+            for m in members
+        ],
             "householdCode": household.household_code,
         },
         headers={"Cache-Control": "no-store"},
@@ -410,7 +447,7 @@ def households_me(request: Request, db: Session = Depends(get_db)):
         "householdId": str(household.id),
         "ownerEmail": household.owner_email,
         "members": [
-            {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+            {"id": str(m.id), "name": m.name}
             for m in members
         ],
         "householdCode": household.household_code,
@@ -454,11 +491,11 @@ def households_create_member(body: NewMemberBody, request: Request, db: Session 
     
     logger.info(f"Created household member with barcode", member_id=str(m.id), barcode=barcode, name=body.name)
     
-    return {"id": str(m.id), "name": m.name, "member_code": m.member_code, "barcode": m.barcode}
+    return {"id": str(m.id), "name": m.name, "barcode": m.barcode}
 
 
 class AttachMemberBody(BaseModel):
-    memberCode: str
+    memberId: str  # Changed from memberCode to memberId
     householdCode: str
 
 
@@ -466,7 +503,7 @@ class AttachMemberBody(BaseModel):
 def households_attach_member(body: AttachMemberBody, db: Session = Depends(get_db)):
     from sqlalchemy import select
     from models import Household, Member
-    member = db.execute(select(Member).where(Member.member_code == body.memberCode.strip().upper())).scalar_one_or_none()
+    member = db.execute(select(Member).where(Member.id == uuid.UUID(body.memberId))).scalar_one_or_none()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     household = db.execute(select(Household).where(Household.household_code == body.householdCode.strip().upper())).scalar_one_or_none()
