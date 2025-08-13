@@ -629,14 +629,9 @@ function AdminDashboard() {
                       ? 'border-red-500 focus:ring-red-500'
                       : 'border-gray-700 focus:ring-blue-500'
                   }`}
-                  maxLength={6}
+                  maxLength={5}
                   onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
                 />
-                {manualAccountCode && !isValidAccountCode(manualAccountCode) && (
-                  <div className="text-red-400 text-xs mt-1">
-                    Account code must be 6 characters (letters and numbers only)
-                  </div>
-                )}
               </div>
               <button
                 onClick={handleManualLookup}

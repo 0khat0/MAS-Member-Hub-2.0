@@ -68,7 +68,7 @@ export default function FamilySwitch({ onSelect }: Props) {
     const householdCode = localStorage.getItem('household_code') || 'N/A'
     return (
       <div className="text-sm text-gray-400">
-        Account #{householdCode} • No family members added yet
+        Account #{householdCode}
       </div>
     )
   }

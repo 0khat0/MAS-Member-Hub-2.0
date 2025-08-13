@@ -58,7 +58,7 @@ try:
 except Exception:
     # Fallback to local generation if util not yet imported (e.g., during initial migrations)
     ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    def gen_code_household(n: int = 6):
+    def gen_code_household(n: int = 5):
         import random
         return "".join(random.choice(ALPHABET) for _ in range(n))
 
@@ -71,7 +71,7 @@ def set_household_code(mapper, connection, target: "Household"):
     if target.owner_email:
         target.owner_email = target.owner_email.strip().lower()
     if not target.household_code:
-        target.household_code = gen_code_household(6)  # 6-character account number
+        target.household_code = gen_code_household(5)  # 5-character account number
 
 class Checkin(Base):
     __tablename__ = "checkins"

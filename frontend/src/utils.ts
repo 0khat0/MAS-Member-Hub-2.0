@@ -5,7 +5,7 @@ export function isValidUUID(uuid: string): boolean {
 
 // Account number validation utility
 export function isValidAccountCode(code: string): boolean {
-  return /^[A-Z2-9]{6}$/.test(code.toUpperCase());
+  return /^[A-Z2-9]{5}$/.test(code.toUpperCase());
 }
 
 // API URL utility

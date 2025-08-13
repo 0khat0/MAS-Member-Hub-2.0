@@ -389,7 +389,7 @@ def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session
     # Validate account number format
     account_number = body.accountNumber.strip().upper()
     if not is_valid_account_code(account_number):
-        raise HTTPException(status_code=422, detail="Account number must be exactly 6 characters from A-Z and 2-9")
+        raise HTTPException(status_code=422, detail="Account number must be exactly 5 characters from A-Z and 2-9")
     
     # Find household by account number (case-insensitive)
     household = db.execute(
