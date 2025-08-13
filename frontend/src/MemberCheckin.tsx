@@ -615,7 +615,7 @@ function MemberCheckin() {
                    {isFamily && familyNames.map((name, idx) => (
                      <motion.div key={idx} className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
                        <input 
-                         className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
+                         className="min-w-0 flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
                           placeholder="Enter member full name" 
                          type="text" 
                          value={name} 
@@ -662,7 +662,7 @@ function MemberCheckin() {
                      whileTap={{ scale: 0.98 }}
                      type="submit"
                    >
-                     {isFamily ? 'Register Family' : 'Create Account'}
+                     {isFamily ? 'Create Account' : 'Create Account'}
                    </motion.button>
                 </div>
               </motion.form>
@@ -739,7 +739,7 @@ function MemberCheckin() {
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
                     <label className="block text-sm font-medium text-white/80 mb-2">Account Code</label>
                     <input 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 text-center tracking-widest font-mono text-lg" 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 text-center tracking-wide font-mono text-lg" 
                       placeholder="Enter your 5-character account code" 
                       type="text" 
                       value={formName} 
