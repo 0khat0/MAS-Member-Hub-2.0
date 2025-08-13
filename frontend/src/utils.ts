@@ -99,6 +99,7 @@ export function setMemberId(memberId: string): void {
 export function clearMemberData(): void {
   localStorage.removeItem("member_id");
   localStorage.removeItem("member_email");
+  localStorage.removeItem("household_code");
 }
 
 // Session reconciliation utility
@@ -118,6 +119,9 @@ export async function reconcileSession(): Promise<any> {
       }
       if (data.ownerEmail) {
         localStorage.setItem('member_email', data.ownerEmail);
+      }
+      if (data.householdCode) {
+        localStorage.setItem('household_code', data.householdCode);
       }
       return data;
     }

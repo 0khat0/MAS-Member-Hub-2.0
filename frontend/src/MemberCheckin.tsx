@@ -220,6 +220,10 @@ function MemberCheckin() {
 
                     // Persist basic context
                     if (otpEmail) localStorage.setItem('member_email', otpEmail)
+                    // Store household code for account number display
+                    if (verifyPayload?.householdCode) {
+                      localStorage.setItem('household_code', verifyPayload.householdCode)
+                    }
                     // Add this line to mark recent authentication
                     localStorage.setItem('last_auth_time', Date.now().toString())
                     if (!firstId) {

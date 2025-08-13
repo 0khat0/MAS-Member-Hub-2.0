@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import { isValidAccountCode } from './utils';
 
 interface DailyCheckin {
   checkin_id: string;
@@ -45,6 +46,15 @@ function AdminDashboard() {
   // Family check-in expansion state
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
   const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<Record<string, Set<string>>>({});
+
+  // Manual check-in functionality
+  const [manualAccountCode, setManualAccountCode] = useState("");
+  const [manualHousehold, setManualHousehold] = useState<any>(null);
+  const [isLoadingManual, setIsLoadingManual] = useState(false);
+  const [manualError, setManualError] = useState("");
+  const [manualSuccess, setManualSuccess] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastLookupTime, setLastLookupTime] = useState<Date | null>(null);
 
   // Loading states
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -284,6 +294,92 @@ function AdminDashboard() {
     setEditEmail("");
   };
 
+  // Manual check-in functions
+  const handleManualLookup = async () => {
+    if (!manualAccountCode.trim()) {
+      setManualError("Please enter an account code");
+      return;
+    }
+
+    setIsLoadingManual(true);
+    setManualError("");
+    setManualSuccess("");
+    setManualHousehold(null);
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_URL}/admin/household/${manualAccountCode.trim()}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setManualError("Account not found");
+        } else {
+          const errorData = await response.json();
+          setManualError(errorData.detail || "Failed to lookup account");
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      setManualHousehold(data);
+      setManualSuccess(`Found account ${data.household_code} with ${data.member_count} members`);
+      setLastLookupTime(new Date());
+    } catch (error) {
+      console.error('Error looking up account:', error);
+      setManualError("Failed to lookup account. Please try again.");
+    } finally {
+      setIsLoadingManual(false);
+    }
+  };
+
+  const handleManualCheckin = async (memberId: string, memberName: string) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_URL}/admin/checkin/member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_id: memberId,
+          timestamp: new Date().toISOString()
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.already_checked_in) {
+          setManualSuccess(`${memberName} is already checked in today`);
+        } else {
+          setManualError(`Failed to check in ${memberName}: ${errorData.detail || 'Unknown error'}`);
+        }
+        return;
+      }
+      
+      const result = await response.json();
+      setManualSuccess(`${memberName} checked in successfully!`);
+      
+      // Refresh the household data to show updated check-in status
+      if (manualHousehold) {
+        handleManualLookup();
+      }
+      
+      // Also refresh today's check-ins
+      fetchTodayCheckins();
+    } catch (error) {
+      console.error('Error checking in member:', error);
+      setManualError(`Failed to check in ${memberName}. Please try again.`);
+    }
+  };
+
+  const clearManualCheckin = () => {
+    setManualAccountCode("");
+    setManualHousehold(null);
+    setManualError("");
+    setManualSuccess("");
+    setLastLookupTime(null);
+  };
+
   const toggleFamilyExpansion = (checkinId: string) => {
     console.log('Toggle clicked for:', checkinId);
     console.log('Current expanded families:', Array.from(expandedFamilies));
@@ -452,8 +548,14 @@ function AdminDashboard() {
       }
     }, 2000); // 2 seconds
     
+    // Update current time every minute
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // 1 minute
+    
     return () => {
       clearInterval(refreshInterval);
+      clearInterval(timeInterval);
       delete (window as any).refreshAdminStats;
       delete (window as any).refreshAdminCheckins;
       delete (window as any).refreshAdminDashboard;
@@ -496,6 +598,143 @@ function AdminDashboard() {
           </div>
 
         </div>
+
+        {/* Manual Check-in Section */}
+        <motion.div 
+          className="bg-gray-900 border border-gray-700 rounded-xl p-6 mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.05 }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-white">Manual Check-in</h2>
+          </div>
+          
+          <div className="space-y-4">
+            {/* Account Code Input */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Enter Account Code (e.g., ABC123)"
+                  value={manualAccountCode}
+                  onChange={(e) => setManualAccountCode(e.target.value.toUpperCase())}
+                  className={`w-full px-4 py-2 rounded-lg bg-gray-800 text-white border focus:outline-none focus:ring-2 font-mono text-lg tracking-wider ${
+                    manualAccountCode && !isValidAccountCode(manualAccountCode)
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-gray-700 focus:ring-blue-500'
+                  }`}
+                  maxLength={6}
+                  onKeyPress={(e) => e.key === 'Enter' && handleManualLookup()}
+                />
+                {manualAccountCode && !isValidAccountCode(manualAccountCode) && (
+                  <div className="text-red-400 text-xs mt-1">
+                    Account code must be 6 characters (letters and numbers only)
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleManualLookup}
+                disabled={isLoadingManual || !manualAccountCode.trim() || !isValidAccountCode(manualAccountCode.trim())}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                {isLoadingManual ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                ) : (
+                  'Lookup'
+                )}
+              </button>
+              {manualHousehold && (
+                <button
+                  onClick={clearManualCheckin}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Error/Success Messages */}
+            {manualError && (
+              <div className="text-red-400 text-sm bg-red-900/20 border border-red-700 rounded-lg px-3 py-2">
+                {manualError}
+              </div>
+            )}
+            {manualSuccess && (
+              <div className="text-green-400 text-sm bg-green-900/20 border border-green-700 rounded-lg px-3 py-2">
+                {manualSuccess}
+              </div>
+            )}
+
+            {/* Household Members Display */}
+            {manualHousehold && (
+              <div className="bg-gray-800 border border-gray-600 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Account #{manualHousehold.household_code}
+                    </h3>
+                    <p className="text-gray-400 text-sm">{manualHousehold.owner_email}</p>
+                    {lastLookupTime && (
+                      <p className="text-gray-500 text-xs mt-1">
+                        Looked up at {lastLookupTime.toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-400">{manualHousehold.member_count}</div>
+                    <div className="text-gray-400 text-sm">Members</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  {manualHousehold.members.map((member: any) => (
+                    <div 
+                      key={member.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        member.already_checked_in 
+                          ? 'bg-green-900/20 border-green-600' 
+                          : 'bg-gray-700/50 border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          member.already_checked_in ? 'bg-green-500' : 'bg-gray-500'
+                        }`}></div>
+                        <div>
+                          <div className="text-white font-medium">{member.name}</div>
+                          <div className="text-gray-400 text-sm">{member.email}</div>
+                          {member.already_checked_in && (
+                            <div className="text-green-400 text-xs">
+                              Checked in at {new Date(member.checkin_time).toLocaleTimeString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleManualCheckin(member.id, member.name)}
+                        disabled={member.already_checked_in}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          member.already_checked_in
+                            ? 'bg-green-700 text-green-200 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        {member.already_checked_in ? 'Checked In' : `Check In (${currentTime.toLocaleTimeString()})`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Scanner Navigation */}
         <motion.div 

@@ -105,6 +105,7 @@ class MemberOut(MemberBase):
     barcode: Optional[str] = None
     created_at: datetime
     deleted_at: Optional[datetime] = None
+    household_code: Optional[str] = None  # Account number from household
 
     class Config:
         from_attributes = True

@@ -841,6 +841,25 @@ function MemberStats({ memberId }: Props) {
             </div>
           </motion.div>
         </motion.div>
+        {/* Account Number Display - Always show at top */}
+        {stats?.household_code && (
+          <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-6 mb-4">
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-white/60 mb-1">Your Account Number</div>
+                <div className="text-3xl font-mono font-bold text-white tracking-wider">
+                  {stats.household_code}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Family Members Section (show if there are family members OR for individual profiles to allow adding) */}
         {familyMembers.length >= 1 || (!isFamily && stats) ? (
           <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
@@ -914,10 +933,10 @@ function MemberStats({ memberId }: Props) {
             <h2 className="text-2xl font-extrabold text-white">
               {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
             </h2>
-            {/* Display Account Number */}
+            {/* Display Account Number prominently */}
             {stats?.household_code && (
-              <div className="text-sm text-white/60 ml-2">
-                Account: {stats.household_code}
+              <div className="text-lg font-mono text-white/80 ml-2 bg-white/10 px-3 py-1 rounded-lg">
+                Account #{stats.household_code}
               </div>
             )}
           </div>

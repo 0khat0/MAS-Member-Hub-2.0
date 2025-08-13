@@ -18,6 +18,7 @@ import models
 from models import generate_barcode
 from database import engine, SessionLocal
 from typing import List, Dict, Optional
+from auth.otp import is_valid_account_code
 
 from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
@@ -1184,9 +1185,21 @@ async def family_checkin_status(request: Request, email: str, db: Session = Depe
 @app.get("/members")
 @limiter.limit("20/minute")
 async def get_members(request: Request, db: Session = Depends(get_db)):
-    """Get all members ordered by join date"""
-    members = db.query(models.Member).order_by(models.Member.created_at.desc()).all()
-    members_data = [models.MemberOut.model_validate(m).model_dump() for m in members]
+    """Get all members ordered by join date with household account numbers"""
+    from sqlalchemy.orm import joinedload
+    
+    # Join with household to get account number
+    members = db.query(models.Member).options(
+        joinedload(models.Member.household)
+    ).order_by(models.Member.created_at.desc()).all()
+    
+    members_data = []
+    for member in members:
+        member_dict = models.MemberOut.model_validate(member).model_dump()
+        # Add household_code (account number) if household exists
+        if member.household:
+            member_dict['household_code'] = member.household.household_code
+        members_data.append(member_dict)
     
     return members_data
 
@@ -1714,6 +1727,60 @@ async def admin_delete_checkin(request: Request, checkin_id: str, db: Session = 
     return {
         "message": f"Check-in for {member_name} deleted successfully",
         "deleted_checkin_id": checkin_id
+    }
+
+@app.get("/admin/household/{account_code}")
+@limiter.limit("20/minute")
+async def admin_get_household_by_code(request: Request, account_code: str, db: Session = Depends(get_db)):
+    """Admin endpoint to find a household by account code and get its members for manual check-in"""
+    # Validate account code format
+    if not is_valid_account_code(account_code):
+        raise HTTPException(status_code=400, detail="Invalid account code format")
+    
+    # Find household by code (case-insensitive)
+    from sqlalchemy import func
+    household = db.query(models.Household).filter(
+        func.upper(models.Household.household_code) == account_code.strip().upper()
+    ).first()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Get all members for this household
+    members = db.query(models.Member).filter(
+        models.Member.household_id == household.id,
+        models.Member.deleted_at.is_(None)
+    ).order_by(models.Member.name).all()
+    
+    # Check which members are already checked in today
+    today_start = datetime.now(pytz.UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    
+    member_data = []
+    for member in members:
+        # Check if member is already checked in today
+        existing_checkin = db.query(models.Checkin).filter(
+            models.Checkin.member_id == member.id,
+            models.Checkin.timestamp >= today_start,
+            models.Checkin.timestamp < today_end
+        ).first()
+        
+        member_data.append({
+            "id": str(member.id),
+            "name": member.name,
+            "email": member.email,
+            "barcode": member.barcode,
+            "already_checked_in": existing_checkin is not None,
+            "checkin_id": str(existing_checkin.id) if existing_checkin else None,
+            "checkin_time": existing_checkin.timestamp.isoformat() if existing_checkin else None
+        })
+    
+    return {
+        "household_id": str(household.id),
+        "household_code": household.household_code,
+        "owner_email": household.owner_email,
+        "members": member_data,
+        "member_count": len(member_data)
     }
 
 # Admin authentication removed - admin routes are now open access 

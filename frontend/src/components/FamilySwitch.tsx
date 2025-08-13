@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/session'
 import { cache, getCache, setCache } from '../lib/cache'
 
-type Member = { id: string; name: string }
+type Member = { id: string; name: string; household_code?: string }
 
 type Props = {
   onSelect: (member: Member) => void
@@ -63,7 +63,15 @@ export default function FamilySwitch({ onSelect }: Props) {
 
   if (loading) return null
   if (error) return <div className="text-sm text-red-400">Error: {error}</div>
-  if (!members.length) return <div className="text-sm text-gray-400">No members yet.</div>
+  if (!members.length) {
+    // Get household code from localStorage or show generic message
+    const householdCode = localStorage.getItem('household_code') || 'N/A'
+    return (
+      <div className="text-sm text-gray-400">
+        Account #{householdCode} • No family members added yet
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
