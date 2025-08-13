@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AuthOTP from './components/AuthOTP'
 import { apiFetch } from './lib/session'
+import { afterOtpVerified } from './lib/afterOtpVerified'
 
 export default function HomeAuth() {
   const [email, setEmail] = useState('')
@@ -73,9 +74,15 @@ export default function HomeAuth() {
         }
       }
       if (firstId) localStorage.setItem('member_id', firstId)
-      window.location.href = firstId ? `/profile?id=${firstId}` : '/profile'
+      // Use afterOtpVerified to handle iOS PWA cookie race condition
+      await afterOtpVerified(() => {
+        window.location.href = firstId ? `/profile?id=${firstId}` : '/profile'
+      })
     } catch {
-      window.location.href = '/profile'
+      // Use afterOtpVerified even on error to ensure proper session handling
+      await afterOtpVerified(() => {
+        window.location.href = '/profile'
+      })
     }
   }
 

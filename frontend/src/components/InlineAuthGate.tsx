@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/session'
 import AuthOTP from './AuthOTP'
+import { afterOtpVerified } from '../lib/afterOtpVerified'
 
 export default function InlineAuthGate() {
   const [show, setShow] = useState(false)
@@ -49,8 +50,10 @@ export default function InlineAuthGate() {
         })
       }
     } catch {}
-    // Redirect to profile; old page logic can still use local storage
-    window.location.href = '/profile'
+    // Use afterOtpVerified to handle iOS PWA cookie race condition
+    await afterOtpVerified(() => {
+      window.location.href = '/profile'
+    })
   }
 
   if (!show) return null

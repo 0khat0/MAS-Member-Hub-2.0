@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
-import { bootstrapSession } from './lib/session'
+import { getSessionOptional } from './lib/session'
+import { getHouseholdId, setHouseholdId, clearAppStorage } from './lib/storage'
 
 // tiny SW debug helpers
 async function unregisterSWIfNoSWParam() {
@@ -48,7 +49,9 @@ export function PWAUpdatePrompt() {
 function BootstrapGate() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
   useEffect(() => {
+    let mounted = true;
     (async () => {
       await unregisterSWIfNoSWParam()
       try {
@@ -59,15 +62,41 @@ function BootstrapGate() {
           const justAuthenticated = lastAuthTime && (Date.now() - parseInt(lastAuthTime)) < 30000
           
           if (!justAuthenticated) {
-            await bootstrapSession(6000)
+            try {
+              const session = await getSessionOptional(6000)
+              if (!mounted) return;
+              
+              if (session) {
+                // Reconcile cached household id
+                const cached = getHouseholdId();
+                if (cached && cached !== session.householdId) {
+                  clearAppStorage();
+                }
+                setHouseholdId(session.householdId);
+              }
+              // No session is normal - don't show error
+            } catch (e: any) {
+              // Only show errors for real issues (5xx, network problems), not 401s
+              if (mounted) {
+                setError(e?.message || 'failed')
+              }
+            }
           }
         }
       } catch (e: any) {
-        setError(e?.message || 'failed')
+        if (mounted) {
+          setError(e?.message || 'failed')
+        }
       } finally {
-        setReady(true)
+        if (mounted) {
+          setReady(true)
+        }
       }
     })()
+    
+    return () => {
+      mounted = false;
+    };
   }, [])
 
   if (!ready) {
@@ -83,7 +112,7 @@ function BootstrapGate() {
     <>
       {error && !location.pathname.startsWith('/admin') && (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-3 py-2 rounded z-50">
-          Couldn’t start session: {error}. <button onClick={()=>location.reload()} className="underline">Reload</button>
+          Couldn't start session: {error}. <button onClick={()=>location.reload()} className="underline">Reload</button>
         </div>
       )}
       <PWAUpdatePrompt />

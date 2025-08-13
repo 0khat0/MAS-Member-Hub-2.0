@@ -4,6 +4,7 @@ import logo from "./assets/mas-logo.png";
 import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime, reconcileSession } from "./utils";
 import AuthOTP from "./components/AuthOTP";
 import { apiFetch, bootstrapSession } from './lib/session'
+import { afterOtpVerified } from './lib/afterOtpVerified'
 
 function getDailyMuayThaiMessage() {
   const messages = [
@@ -273,7 +274,10 @@ function MemberCheckin() {
                     }
 
                     const profileUrl = firstId ? `/profile?id=${firstId}` : `/profile?email=${encodeURIComponent(otpEmail)}`
-                    window.location.replace(profileUrl)
+                    // Use afterOtpVerified to handle iOS PWA cookie race condition
+                    await afterOtpVerified(() => {
+                      window.location.replace(profileUrl)
+                    })
                   } catch (error) {
                     console.error('OTP verification error:', error)
                     setOtpPendingId(null)
