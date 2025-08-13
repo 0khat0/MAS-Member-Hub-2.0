@@ -393,7 +393,7 @@ function MemberCheckin() {
                     }`}
                     onClick={() => setCheckinByName(false)}
                   >
-                    Register
+                    Create Account
                   </button>
                   <span className="text-white/60">or</span>
                   <button
@@ -405,12 +405,12 @@ function MemberCheckin() {
                     }`}
                     onClick={() => setCheckinByName(true)}
                   >
-                    Log In
+                    Sign In with Code
                   </button>
                 </div>
              </motion.div>
 
-            {/* Show registration form or check-in by name form */}
+            {/* Show registration form or account code sign-in form */}
             {!checkinByName ? (
               <motion.form
                 className="w-full max-w-md space-y-6"
@@ -675,197 +675,64 @@ function MemberCheckin() {
                 transition={{ duration: 0.3 }}
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  // Validate all names
-                  const allNames = [formName, ...familyNames];
-                  console.log("🔍 Starting returning user flow with names:", allNames);
-                  
-                  for (const name of allNames) {
-                    if (!/^\s*\S+\s+\S+/.test(name.trim())) {
-                      setMessage("Please enter a full name (first and last) for each member.");
-                      return;
-                    }
+                  if (!formName.trim()) {
+                    setMessage("Please enter your account code.");
+                    return;
                   }
+                  
                   setStatus("loading");
                   setMessage("");
-                  const API_URL = getApiUrl();
                   
                   try {
-                    // STEP 1: Check which names exist and which don't
-                    const existingMembers = [];
-                    const newMembers = [];
-                    let familyEmail = null;
+                    // Login with account code
+                    const res = await apiFetch('/v1/auth/start-account', {
+                      method: 'POST',
+                      body: JSON.stringify({ accountNumber: formName.trim() })
+                    });
                     
-                    console.log("🔍 STEP 1: Checking each name...");
-                    for (const name of allNames) {
-                      console.log(`🔍 Checking name: "${name.trim()}"`);
-                      try {
-                      const lookupRes = await fetch(`${API_URL}/member/lookup-by-name`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name: name.trim() }),
-                      });
-                        if (lookupRes.ok) {
-                          const memberData = await lookupRes.json();
-                          console.log(`✅ Found existing member:`, memberData);
-                          existingMembers.push({
-                            name: name.trim(),
-                            email: memberData.email,
-                            id: memberData.id
-                          });
-                          // Use the first found member's email as the family email
-                          if (!familyEmail) {
-                            familyEmail = memberData.email;
-                            console.log(`📧 Set family email to: ${familyEmail}`);
-                      }
-                        } else {
-                          console.log(`❌ Name not found: "${name.trim()}" - adding to new members`);
-                          newMembers.push(name.trim());
-                        }
-                      } catch (error) {
-                        console.log(`❌ Error looking up "${name.trim()}":`, error);
-                        newMembers.push(name.trim());
-                      }
-                    }
-                    
-                    console.log("🔍 STEP 1 RESULTS:");
-                    console.log("- Existing members:", existingMembers);
-                    console.log("- New members:", newMembers);
-                    console.log("- Family email:", familyEmail);
-                    
-                    // If no existing members found, show error
-                    if (existingMembers.length === 0) {
-                      console.log("❌ No existing members found, redirecting to register");
-                      setStatus("register");
-                      setFormName("");
-                      setFamilyNames([]);
-                      setMessage("No existing members found with these names. Please register instead.");
+                    if (!res.ok) {
+                      const errorData = await res.json();
+                      setStatus("error");
+                      setMessage(errorData.detail || "Invalid account code. Please try again.");
                       return;
                     }
                     
-                    // STEP 2: Add new members to the existing family (if any)
-                    if (newMembers.length > 0 && familyEmail) {
-                      console.log("🔍 STEP 2: Adding new members to family...");
-                      console.log(`📝 Adding ${newMembers.length} new members to email: ${familyEmail}`);
-                      try {
-                        const addRes = await fetch(`${API_URL}/family/add-members`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            email: familyEmail,
-                            new_members: newMembers,
-                          }),
-                      });
-                        if (addRes.ok) {
-                          const addResult = await addRes.json();
-                          console.log("✅ Successfully added new members:", addResult);
-                        } else {
-                          const err = await addRes.json();
-                          console.error("❌ Failed to add new members:", err.detail);
-                      }
-                      } catch (error) {
-                        console.error("❌ Error adding new members:", error);
-                    }
-                    } else {
-                      console.log("🔍 STEP 2: Skipped - no new members to add");
-                    }
+                    const data = await res.json();
+                    setOtpPendingId(data.pendingId);
+                    setOtpEmailMasked(data.to);
+                    setOtpEmail(data.to);
                     
-                    // STEP 3: Get updated family info and set up localStorage
-                    console.log("🔍 STEP 3: Getting updated family info...");
-                    try {
-                      const familyRes = await fetch(`${API_URL}/family/members/${encodeURIComponent(familyEmail)}`);
-                      if (familyRes.ok) {
-                        const familyData = await familyRes.json();
-                        const familyMemberNames = familyData.map((m: any) => m.name);
-                        console.log("✅ Updated family members:", familyMemberNames);
-                        
-                        // Set up localStorage
-                        localStorage.setItem("family_members", JSON.stringify(familyMemberNames));
-                        localStorage.setItem("member_email", familyEmail);
-                        localStorage.setItem("member_id", existingMembers[0].id);
-                        setMemberEmail(familyEmail);
-                        setFamilyMembers(familyMemberNames);
-                        console.log("✅ localStorage updated");
-                        
-                        // For sign-in flow, just redirect to profile (no check-in)
-                        if (familyMemberNames.length > 1) {
-                          // Family - redirect to family profile using email
-                          window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
-                          return;
-                        } else {
-                          // Single member - redirect to profile
-                          window.location.href = `/profile?id=${existingMembers[0].id}`;
-                          return;
-                        }
-                      } else {
-                        console.error("❌ Failed to load family information");
-                        setStatus("error");
-                        setMessage("Failed to load family information.");
-                  }
-                    } catch (error) {
-                      console.error("❌ Network error loading family information:", error);
-                      setStatus("error");
-                      setMessage("Network error loading family information.");
-                    }
                   } catch (error) {
-                    console.error("❌ General network error:", error);
+                    console.error("Login error:", error);
                     setStatus("error");
                     setMessage("Network error. Please try again.");
                   }
                 }}
               >
                 <div className="glass-card space-y-6 p-6">
-                  {message && (<div className="text-red-400 text-center font-semibold mb-2">{message}</div>)}
                   <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="block text-sm font-medium text-white/80">Member Full Name</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowLoginInfo(true)}
-                        className="w-4 h-4 rounded-full bg-white/20 text-white/70 hover:bg-white/30 hover:text-white transition-colors duration-200 flex items-center justify-center text-xs font-medium"
-                        title="Login help"
-                      >
-                        ?
-                      </button>
-                    </div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Account Code</label>
                     <input 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                      placeholder="Enter member full name" 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 text-center tracking-widest font-mono text-lg" 
+                      placeholder="Enter your 5-character account code" 
                       type="text" 
                       value={formName} 
-                      onChange={e => setFormName(e.target.value)} 
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 5);
+                        setFormName(value);
+                      }}
+                      maxLength={5}
                       required 
                     />
                   </motion.div>
-                                     {/* Family member fields */}
-                   {familyNames.map((name, idx) => (
-                     <div key={idx} className="flex items-center gap-3">
-                       <input 
-                         className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                          placeholder="Enter member full name" 
-                         type="text" 
-                         value={name} 
-                         onChange={e => handleFamilyNameChange(idx, e.target.value)} 
-                         required 
-                       />
-                       <button 
-                         type="button" 
-                         className="bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg transition-all duration-200 hover:scale-110 shadow-lg" 
-                         onClick={() => removeFamilyMember(idx)} 
-                         aria-label="Remove family member"
-                         title="Remove family member"
-                       >
-                         ×
-                       </button>
-                     </div>
-                   ))}
-                                     <motion.button
-                     className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
-                     whileHover={{ scale: 1.02 }}
-                     whileTap={{ scale: 0.98 }}
-                     type="submit"
-                   >
-                     Log In
-                   </motion.button>
+                                                       <motion.button
+                    className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                  >
+                    Sign In
+                  </motion.button>
                 </div>
               </motion.form>
             )}
@@ -938,7 +805,7 @@ function MemberCheckin() {
               >
                 <div className="p-6 border-b border-white/10">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">Login Help</h2>
+                    <h2 className="text-lg font-semibold text-white">Sign In Help</h2>
                     <button
                       onClick={() => setShowLoginInfo(false)}
                       className="text-white/60 hover:text-white transition-colors"
@@ -953,9 +820,9 @@ function MemberCheckin() {
                 <div className="p-6">
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-white font-medium mb-2">👤 For Individuals</h3>
+                      <h3 className="text-white font-medium mb-2">🔐 Sign In with Account Code</h3>
                       <p className="text-white/70 text-sm">
-                        Enter your full name as registered in the system.
+                        Enter your 5-character account code to access your membership.
                       </p>
                     </div>
                     
@@ -964,16 +831,16 @@ function MemberCheckin() {
                 <svg className="inline w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-                For Families
+                Create New Account
               </h3>
                       <p className="text-white/70 text-sm">
-                        If you're part of a family membership, just enter <strong>any one name</strong> from your family to log in.
+                        If you're new, create an account with your name and email to get started.
                       </p>
                     </div>
                     
                     <div className="bg-blue-900/30 border border-blue-600/50 rounded-lg p-3">
                       <p className="text-blue-300 text-sm">
-                        💡 <strong>Tip:</strong> Use the exact spelling of the name as it appears in your membership.
+                        💡 <strong>Tip:</strong> Your account code is a 5-character code containing letters and numbers (excluding I, O, 0, 1).
                       </p>
                     </div>
                   </div>

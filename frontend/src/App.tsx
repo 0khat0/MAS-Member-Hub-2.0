@@ -29,7 +29,7 @@ const LoadingSpinner = () => (
 const Footer = () => (
   <footer className="text-gray-400 text-center py-3 px-4 mx-4 mb-4 mt-auto">
     <span>
-      Built by Omar Khatib | 
+    With ❤️ by Omar | 
       <button 
         onClick={reportIssue}
         className="text-gray-400 hover:text-white underline transition-colors duration-200"
