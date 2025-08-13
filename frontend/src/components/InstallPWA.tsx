@@ -235,9 +235,8 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => {
-                // Keep the card visible so users can follow steps;
-                // or hide if you prefer:
-                // setShowIOSHelp(false);
+                // Hide the iOS help sheet and show the main install prompt again
+                setShowIOSHelp(false);
               }}
               style={btnStyle}
             >
