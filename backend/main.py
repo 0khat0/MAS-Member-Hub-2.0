@@ -1100,10 +1100,27 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
 @app.get("/family/members/{email}")
 @limiter.limit("20/minute")
 async def get_family_members(request: Request, email: str, db: Session = Depends(get_db)):
-    """Get all family members by email (including soft-deleted)"""
-    members = db.query(models.Member).filter(
-        models.Member.email == email
-    ).all()
+    """Get all family members by email using the household system"""
+    # Find the first member with this email to get their household
+    first_member = db.query(models.Member).filter(
+        models.Member.email == email,
+        models.Member.deleted_at.is_(None)
+    ).first()
+    
+    if not first_member:
+        raise HTTPException(status_code=404, detail="No family members found with this email")
+    
+    # If the member has a household, get all members from that household
+    if first_member.household_id:
+        members = db.query(models.Member).filter(
+            models.Member.household_id == first_member.household_id,
+            models.Member.deleted_at.is_(None)
+        ).all()
+    else:
+        # Fallback to old email-based system for backward compatibility
+        members = db.query(models.Member).filter(
+            models.Member.email == email
+        ).all()
     
     if not members:
         raise HTTPException(status_code=404, detail="No family members found with this email")
@@ -1113,12 +1130,21 @@ async def get_family_members(request: Request, email: str, db: Session = Depends
 @app.post("/family/checkin")
 @limiter.limit("5/minute")
 async def family_checkin(request: Request, checkin_data: models.FamilyCheckin, db: Session = Depends(get_db)):
-    """Check in selected family members"""
+    """Check in selected family members using the household system"""
     email = checkin_data.email
     member_names = checkin_data.member_names
     
     if not email or not member_names:
         raise HTTPException(status_code=400, detail="Email and member names are required")
+    
+    # Find the first member with this email to get their household
+    first_member = db.query(models.Member).filter(
+        models.Member.email == email,
+        models.Member.deleted_at.is_(None)
+    ).first()
+    
+    if not first_member:
+        raise HTTPException(status_code=404, detail="No family members found with this email")
     
     # Get Eastern time for AM/PM logic
     eastern_tz = pytz.timezone('America/New_York')
@@ -1141,12 +1167,22 @@ async def family_checkin(request: Request, checkin_data: models.FamilyCheckin, d
     
     results = []
     for name in member_names:
-        # Get member
-        member = db.query(models.Member).filter(
-            models.Member.email == email,
-            models.Member.name == name,
-            models.Member.deleted_at.is_(None)
-        ).first()
+        # Get member - try household first, fallback to email
+        member = None
+        if first_member.household_id:
+            member = db.query(models.Member).filter(
+                models.Member.household_id == first_member.household_id,
+                models.Member.name == name,
+                models.Member.deleted_at.is_(None)
+            ).first()
+        
+        if not member:
+            # Fallback to old email-based system
+            member = db.query(models.Member).filter(
+                models.Member.email == email,
+                models.Member.name == name,
+                models.Member.deleted_at.is_(None)
+            ).first()
         
         if not member:
             results.append(f"{name}: Member not found")
@@ -1182,11 +1218,30 @@ async def family_checkin(request: Request, checkin_data: models.FamilyCheckin, d
 @limiter.limit("10/minute")
 async def family_checkin_status(request: Request, email: str, db: Session = Depends(get_db)):
     """Return which family members have checked in and which have not for the current day and AM/PM period."""
-    # Get all active family members
-    members = db.query(models.Member).filter(
+    # Find the first member with this email to get their household
+    first_member = db.query(models.Member).filter(
         models.Member.email == email,
         models.Member.deleted_at.is_(None)
-    ).all()
+    ).first()
+    
+    if not first_member:
+        raise HTTPException(status_code=404, detail="No family members found with this email")
+    
+    # Get all active family members - try household first, fallback to email
+    members = []
+    if first_member.household_id:
+        members = db.query(models.Member).filter(
+            models.Member.household_id == first_member.household_id,
+            models.Member.deleted_at.is_(None)
+        ).all()
+    
+    if not members:
+        # Fallback to old email-based system
+        members = db.query(models.Member).filter(
+            models.Member.email == email,
+            models.Member.deleted_at.is_(None)
+        ).all()
+    
     if not members:
         raise HTTPException(status_code=404, detail="No family members found with this email")
 
@@ -1474,27 +1529,35 @@ async def restore_member(request: Request, member_id: str, db: Session = Depends
 @app.post("/family/add-members")
 @limiter.limit("10/minute")
 async def add_family_members(request: Request, add_data: dict, db: Session = Depends(get_db)):
-    """Add new members to an existing family account"""
+    """Add new members to an existing family account using the household system"""
     email = add_data.get("email")
     new_members = add_data.get("new_members", [])
     
     if not email or not new_members:
         raise HTTPException(status_code=400, detail="Email and new members are required")
     
-    # Verify the family exists
-    existing_family = db.query(models.Member).filter(
+    # Find the existing member and their household
+    existing_member = db.query(models.Member).filter(
         models.Member.email == email,
         models.Member.deleted_at.is_(None)
     ).first()
     
-    if not existing_family:
+    if not existing_member:
         raise HTTPException(status_code=404, detail="Family not found")
     
-    # Check if any new member already exists with this email
+    # Get the household for this family
+    household = None
+    if existing_member.household_id:
+        household = db.query(models.Household).filter(models.Household.id == existing_member.household_id).first()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Household not found for this family")
+    
+    # Check if any new member already exists in this household
     existing_new_members = []
     for member_name in new_members:
         existing = db.query(models.Member).filter(
-            models.Member.email == email,
+            models.Member.household_id == household.id,
             models.Member.name == member_name,
             models.Member.deleted_at.is_(None)
         ).first()
@@ -1504,7 +1567,7 @@ async def add_family_members(request: Request, add_data: dict, db: Session = Dep
     if existing_new_members:
         raise HTTPException(status_code=409, detail=f"Members already exist in this family: {', '.join(existing_new_members)}")
     
-    # Add new family members
+    # Add new family members to the same household
     created_members = []
     for member_name in new_members:
         # Generate unique barcode for each new family member
@@ -1515,23 +1578,34 @@ async def add_family_members(request: Request, add_data: dict, db: Session = Dep
             if not existing_barcode:
                 break
         
-        member = models.Member(email=email, name=member_name, barcode=barcode)
+        # Create new member with the same household_id (same account code)
+        member = models.Member(
+            email=email, 
+            name=member_name, 
+            barcode=barcode,
+            household_id=household.id  # This ensures they share the same account code
+        )
         db.add(member)
         created_members.append(member)
         MEMBER_COUNT.inc()
     
     db.commit()
     
-    # Get all family members after addition
+    # Get all family members after addition (from the same household)
     all_family_members = db.query(models.Member).filter(
-        models.Member.email == email,
+        models.Member.household_id == household.id,
         models.Member.deleted_at.is_(None)
     ).all()
     
-    logger.info("Members added to family", email=email, new_members=new_members, total_family_size=len(all_family_members))
+    logger.info("Members added to family", 
+                household_id=str(household.id), 
+                household_code=household.household_code,
+                new_members=new_members, 
+                total_family_size=len(all_family_members))
     
     return {
-        "message": f"Added {len(created_members)} new members to family",
+        "message": f"Added {len(created_members)} new members to family account {household.household_code}",
+        "household_code": household.household_code,
         "new_members": [models.MemberOut.model_validate(m) for m in created_members],
         "all_family_members": [models.MemberOut.model_validate(m) for m in all_family_members]
     }
