@@ -875,12 +875,12 @@ function MemberStats({ memberId }: Props) {
               {/* Compact Add Member Button */}
               <button
                 onClick={() => setShowAddMemberModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center gap-1.5"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Add Member
+                Add
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1066,20 +1066,6 @@ function MemberStats({ memberId }: Props) {
                 </svg>
                 Edit Profile
               </button>
-              
-              {/* Add Family Member Option - Only show for individual profiles */}
-              {familyMembers.length <= 1 && (
-                <button
-                  type="button"
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200 flex items-center gap-2 ml-3"
-                  onClick={() => setShowAddMemberModal(true)}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add Family Member
-                </button>
-              )}
             </div>
           )}
           {editError && (
@@ -1089,6 +1075,32 @@ function MemberStats({ memberId }: Props) {
               <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-green-700 text-sm">{editSuccess}</div>
           )}
         </div>
+        
+        {/* Add Family Member Card - Only show for individual profiles */}
+        {familyMembers.length <= 1 && (
+          <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <span className="text-white/80 text-sm">Want to add family members?</span>
+              </div>
+              <button
+                type="button"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                onClick={() => setShowAddMemberModal(true)}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Family Member
+              </button>
+            </div>
+          </div>
+        )}
         {/* Stats Section (card with 3 inner boxes) */}
         <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
           <div className="flex items-center gap-3 mb-6">
