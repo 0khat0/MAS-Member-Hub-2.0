@@ -191,10 +191,16 @@ def _create_session_cookie(response: Response, household_id: str):
         path="/",
         max_age=SESSION_MAX_AGE,
     )
+    return token
 
 
 def _get_household_id_from_request(request: Request) -> Optional[str]:
     token = request.cookies.get(SESSION_COOKIE)
+    # Allow temporary Authorization Bearer token for immediate post-verify calls (iOS PWA cookie race)
+    if not token:
+        auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+        if auth_header and isinstance(auth_header, str) and auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
     if not token:
         return None
     try:
@@ -301,7 +307,7 @@ def auth_session(request: Request, db: Session = Depends(get_db)):
     household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
     if not household:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    return {"ok": True, "householdId": str(household.id), "email": household.owner_email}
+    return JSONResponse({"ok": True, "householdId": str(household.id), "email": household.owner_email}, headers={"Cache-Control": "no-store"})
 
 
 class StartAuthBody(BaseModel):
@@ -369,18 +375,24 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
     db.add(household)
     db.commit()
 
-    _create_session_cookie(response, str(household.id))
-
+    token = _create_session_cookie(response, str(household.id))
+    # prevent caching; include a short-lived session_token echo for immediate use
+    response.headers["Cache-Control"] = "no-store"
     members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
-    return {
-        "householdId": str(household.id),
-        "ownerEmail": household.owner_email,
-        "members": [
-            {"id": str(m.id), "name": m.name, "member_code": m.member_code}
-            for m in members
-        ],
-        "householdCode": household.household_code,
-    }
+    return JSONResponse(
+        {
+            "ok": True,
+            "session_token": token,
+            "householdId": str(household.id),
+            "ownerEmail": household.owner_email,
+            "members": [
+                {"id": str(m.id), "name": m.name, "member_code": m.member_code}
+                for m in members
+            ],
+            "householdCode": household.household_code,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/households/me")

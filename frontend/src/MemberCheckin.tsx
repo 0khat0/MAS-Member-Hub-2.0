@@ -173,84 +173,96 @@ function MemberCheckin() {
                 pendingId={otpPendingId}
                 emailMasked={otpEmailMasked}
                 rawEmail={otpEmail}
-                onVerified={async () => {
+                onVerified={async (verifyPayload: any) => {
+                  const sessionToken: string | undefined = verifyPayload?.session_token
                   try {
                     console.log('OTP verified, starting member creation...')
-                    // Wait a moment for the session cookie to be set
-                    await new Promise(resolve => setTimeout(resolve, 1000))
-                    
+                    // Brief pause so iOS can persist the cookie
+                    await new Promise(resolve => setTimeout(resolve, 600))
+
                     const names = (isFamily ? [formName, ...familyNames] : [formName])
                       .map(n => (n || '').trim())
                       .filter(n => n.length > 0)
-                    
+
                     let firstId: string | null = null
-                    
-                    // Create members one by one
-                    console.log('Creating members for names:', names)
+
+                    // Attempt member creation using cookie first
                     for (const name of names) {
                       try {
-                        console.log('Creating member:', name)
-                        const response = await apiFetch('/v1/households/members', {
+                        const res = await apiFetch('/v1/households/members', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ name: name.trim() })
                         })
-                        
-                        console.log('Member creation response:', response.status, response.ok)
-                        
-                        if (response.ok) {
-                          const memberData = await response.json()
-                          if (!firstId) firstId = memberData.id
-                          console.log('Created member:', memberData)
-                        } else {
-                          const errorText = await response.text()
-                          console.error('Failed to create member:', response.status, errorText)
+                        if (res.ok) {
+                          const m = await res.json()
+                          if (!firstId) firstId = m?.id ?? null
                         }
-                      } catch (error) {
-                        console.error('Error creating member:', error)
+                      } catch {}
+                    }
+
+                    // If no member created and we have a session token, try again with Bearer token (cookie race workaround)
+                    if (!firstId && sessionToken) {
+                      for (const name of names) {
+                        try {
+                          const res = await apiFetch('/v1/households/members', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+                            body: JSON.stringify({ name: name.trim() })
+                          })
+                          if (res.ok) {
+                            const m = await res.json()
+                            if (!firstId) firstId = m?.id ?? null
+                          }
+                        } catch {}
                       }
                     }
-                    
-                    // Store session context
+
+                    // Persist basic context
                     if (otpEmail) localStorage.setItem('member_email', otpEmail)
-                    if (firstId) localStorage.setItem('member_id', firstId)
-                    
-                    console.log('Members created, firstId:', firstId, 'email:', otpEmail)
-                    
-                    // Verify session is working before redirect
-                    try {
-                      const sessionCheck = await apiFetch('/v1/auth/session')
-                      if (sessionCheck.ok) {
-                        console.log('Session verified, redirecting to profile')
-                        
-                        // Check if we're in a PWA context
-                        const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
-                                     (window.navigator as any).standalone === true
-                        console.log('PWA context detected:', isPWA)
-                        
-                        // Use replace to avoid back button issues on mobile
-                        const profileUrl = firstId 
-                          ? `/profile?id=${firstId}` 
-                          : `/profile?email=${encodeURIComponent(otpEmail)}`
-                        
-                        console.log('Redirecting to:', profileUrl)
-                        window.location.replace(profileUrl)
-                      } else {
-                        throw new Error('Session check failed')
+                    if (!firstId) {
+                      // Try to read household members (cookie first, then token)
+                      let me = await apiFetch('/v1/households/me').catch(() => null)
+                      if ((!me || !me.ok) && sessionToken) {
+                        me = await apiFetch('/v1/households/me', { headers: { 'Authorization': `Bearer ${sessionToken}` } }).catch(() => null) as any
                       }
-                    } catch (sessionError) {
-                      console.error('Session verification failed:', sessionError)
-                      // Fallback redirect
-                      const profileUrl = firstId 
-                        ? `/profile?id=${firstId}` 
-                        : `/profile?email=${encodeURIComponent(otpEmail)}`
-                      console.log('Fallback redirect to:', profileUrl)
-                      window.location.replace(profileUrl)
+                      if (me && me.ok) {
+                        const data = await me.json()
+                        firstId = data?.members?.[0]?.id ?? null
+                      }
                     }
+                    if (firstId) localStorage.setItem('member_id', firstId)
+
+                    // Confirm session via probe with small retries
+                    let sessionOk = false
+                    for (let i = 0; i < 3 && !sessionOk; i++) {
+                      try {
+                        let probe = await apiFetch('/v1/auth/session')
+                        if (!probe.ok && sessionToken) {
+                          probe = await apiFetch('/v1/auth/session', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
+                        }
+                        sessionOk = probe.ok
+                        if (!sessionOk) await new Promise(r => setTimeout(r, 300 * (i + 1)))
+                      } catch {
+                        await new Promise(r => setTimeout(r, 300 * (i + 1)))
+                      }
+                    }
+
+                    if (!firstId) {
+                      // Show error instead of infinite spinner
+                      setOtpPendingId(null)
+                      setStatus('error')
+                      setMessage('Could not create your profile. Please try again or reload the app.')
+                      return
+                    }
+
+                    const profileUrl = firstId ? `/profile?id=${firstId}` : `/profile?email=${encodeURIComponent(otpEmail)}`
+                    window.location.replace(profileUrl)
                   } catch (error) {
                     console.error('OTP verification error:', error)
-                    // Emergency fallback
-                    window.location.replace(`/profile?email=${encodeURIComponent(otpEmail)}`)
+                    setOtpPendingId(null)
+                    setStatus('error')
+                    setMessage('We could not complete registration. Please try again or reload the app.')
                   }
                 }}
               />
