@@ -19,7 +19,7 @@ class Household(Base):
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     email_verification_token_hash = Column(Text, nullable=True)
     email_verification_expires_at = Column(DateTime(timezone=True), nullable=True)
-    household_code = Column(String, nullable=True, unique=True, index=True)
+    household_code = Column(String(6), nullable=False, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(pytz.UTC), index=True)
 
     members = relationship("Member", back_populates="household")
@@ -48,6 +48,7 @@ class Member(Base):
         Index('idx_member_email_active', 'email', 'active'),
         Index('idx_member_created_active', 'created_at', 'active'),
         Index('idx_member_email_deleted', 'email', 'deleted_at'),  # For family queries
+        Index('idx_member_household_name_unique', 'household_id', 'name', unique=True),  # Prevent duplicate names per household
     )
 
 

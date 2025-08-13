@@ -7,11 +7,8 @@ def _gen(n: int) -> str:
     return "".join(random.choice(ALPHABET) for _ in range(n))
 
 
-def gen_code_member(n: int = 7) -> str:
+def gen_code_household(n: int = 6) -> str:
+    """Generate a random 6-character household code (account number)."""
     return _gen(n)
-
-
-def gen_code_household(n: int = 7) -> str:
-    return "MAS-" + _gen(n)
 
 

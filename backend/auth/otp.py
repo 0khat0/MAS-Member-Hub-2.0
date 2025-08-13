@@ -43,3 +43,10 @@ def rate_limit_ok(key: str) -> bool:
     return True
 
 
+def is_valid_account_code(code: str) -> bool:
+    """Validate account code format: exactly 6 characters from A-Z, 2-9 (exclude I,O,0,1)."""
+    if not code or len(code) != 6:
+        return False
+    return all(c in "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" for c in code.upper())
+
+

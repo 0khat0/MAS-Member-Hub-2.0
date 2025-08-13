@@ -310,6 +310,36 @@ def auth_session(request: Request, db: Session = Depends(get_db)):
     return JSONResponse({"ok": True, "householdId": str(household.id), "email": household.owner_email}, headers={"Cache-Control": "no-store"})
 
 
+@router.post("/auth/reconcile-session")
+def reconcile_session(request: Request, db: Session = Depends(get_db)):
+    """Reconcile client-side session data with server-side session to prevent cross-contamination."""
+    from sqlalchemy import select
+    from models import Household, Member
+    
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Get the current household and its members
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    members = db.execute(select(Member).where(Member.household_id == household.id)).scalars().all()
+    
+    # Return the authoritative household data for client reconciliation
+    return {
+        "householdId": str(household.id),
+        "ownerEmail": household.owner_email,
+        "householdCode": household.household_code,
+        "members": [
+            {"id": str(m.id), "name": m.name, "email": m.email}
+            for m in members
+        ],
+        "timestamp": datetime.now(pytz.UTC).isoformat()
+    }
+
+
 class StartAuthBody(BaseModel):
     email: EmailStr
 
@@ -350,24 +380,29 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
 
 @router.post("/auth/start-account")
 def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session = Depends(get_db)):
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     from models import Household
     from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
     from emails.sender import send_email
     
+    # Validate account number format
     account_number = body.accountNumber.strip().upper()
-    if not account_number:
-        raise HTTPException(status_code=400, detail="Account number is required")
+    if not is_valid_account_code(account_number):
+        raise HTTPException(status_code=422, detail="Account number must be exactly 6 characters from A-Z and 2-9")
     
-    # Find household by account number
-    household = db.execute(select(Household).where(Household.household_code == account_number)).scalar_one_or_none()
+    # Find household by account number (case-insensitive)
+    household = db.execute(
+        select(Household).where(func.upper(Household.household_code) == account_number)
+    ).scalar_one_or_none()
+    
+    # Always return 200 to avoid account enumeration
     if not household:
-        raise HTTPException(status_code=404, detail="Account not found")
+        return {"message": "If an account exists with this number, a verification code will be sent to the registered email."}
     
     email = household.owner_email
     
-    # Rate limiting
-    rl_key = f"{request.client.host}:{email}"
+    # Rate limiting by IP + account
+    rl_key = f"{request.client.host}:{account_number}"
     if not rate_limit_ok(rl_key):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
     
@@ -382,6 +417,20 @@ def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session
     send_email(to=email, subject="Your MAS verification code", html=html)
     
     return {"pendingId": str(household.id), "to": mask_email(email)}
+
+
+@router.post("/auth/logout")
+def logout_auth(response: Response):
+    """Clear session cookie on logout"""
+    response.delete_cookie(
+        key=SESSION_COOKIE,
+        path="/",
+        secure=os.getenv("ENVIRONMENT") == "production",
+        samesite=("none" if os.getenv("ENVIRONMENT") == "production" else "lax")
+    )
+    return {"message": "Logged out successfully"}
+
+
 class VerifyAuthBody(BaseModel):
     pendingId: str
     code: str
@@ -500,20 +549,31 @@ class AttachMemberBody(BaseModel):
 
 
 @router.post("/households/attach-member")
-def households_attach_member(body: AttachMemberBody, db: Session = Depends(get_db)):
+def households_attach_member(body: AttachMemberBody, request: Request, db: Session = Depends(get_db)):
     from sqlalchemy import select
     from models import Household, Member
+    
+    # Ensure user is authenticated and can only attach to their own household
+    hid = _get_household_id_from_request(request)
+    if not hid:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Verify the member exists and belongs to the authenticated user's household
     member = db.execute(select(Member).where(Member.id == uuid.UUID(body.memberId))).scalar_one_or_none()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    household = db.execute(select(Household).where(Household.household_code == body.householdCode.strip().upper())).scalar_one_or_none()
-    if not household:
-        raise HTTPException(status_code=404, detail="Household not found")
-    member.household_id = household.id
-    member.email = household.owner_email
-    db.add(member)
-    db.commit()
-    return {"linked": True}
+    
+    # Verify the member belongs to the authenticated user's household
+    if str(member.household_id) != hid:
+        raise HTTPException(status_code=403, detail="Cannot attach member from another household")
+    
+    # Verify the target household code matches the authenticated user's household
+    household = db.execute(select(Household).where(Household.id == uuid.UUID(hid))).scalar_one_or_none()
+    if not household or household.household_code != body.householdCode.strip().upper():
+        raise HTTPException(status_code=403, detail="Invalid household code")
+    
+    # No changes needed - member is already in the correct household
+    return {"linked": True, "message": "Member is already in the correct household"}
 
 app.include_router(router)
 

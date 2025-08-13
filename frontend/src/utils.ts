@@ -3,6 +3,11 @@ export function isValidUUID(uuid: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
 }
 
+// Account number validation utility
+export function isValidAccountCode(code: string): boolean {
+  return /^[A-Z2-9]{6}$/.test(code.toUpperCase());
+}
+
 // API URL utility
 export function getApiUrl(): string {
   return import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
@@ -94,6 +99,33 @@ export function setMemberId(memberId: string): void {
 export function clearMemberData(): void {
   localStorage.removeItem("member_id");
   localStorage.removeItem("member_email");
+}
+
+// Session reconciliation utility
+export async function reconcileSession(): Promise<any> {
+  try {
+    const API_URL = getApiUrl();
+    const response = await fetch(`${API_URL}/v1/auth/reconcile-session`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      // Update localStorage with authoritative data
+      if (data.householdId) {
+        localStorage.setItem('household_id', data.householdId);
+      }
+      if (data.ownerEmail) {
+        localStorage.setItem('member_email', data.ownerEmail);
+      }
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error('Session reconciliation failed:', error);
+    return null;
+  }
 }
 
 // Report issue utility

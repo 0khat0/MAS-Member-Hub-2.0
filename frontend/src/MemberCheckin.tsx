@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "./assets/mas-logo.png";
-import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime } from "./utils";
+import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime, reconcileSession } from "./utils";
 import AuthOTP from "./components/AuthOTP";
 import { apiFetch, bootstrapSession } from './lib/session'
 
@@ -248,6 +248,16 @@ function MemberCheckin() {
                       } catch {
                         await new Promise(r => setTimeout(r, 300 * (i + 1)))
                       }
+                    }
+
+                    // Reconcile session to prevent cross-contamination
+                    try {
+                      const reconciled = await reconcileSession()
+                      if (reconciled) {
+                        console.log('Session reconciled:', reconciled)
+                      }
+                    } catch (error) {
+                      console.warn('Session reconciliation failed:', error)
                     }
 
                     if (!firstId) {

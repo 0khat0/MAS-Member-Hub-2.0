@@ -81,8 +81,22 @@ function ProfilePage() {
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Call backend logout to clear cookie
+      const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      await fetch(`${API_URL}/v1/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    }
+    
+    // Clear all localStorage data
     clearMemberData();
+    localStorage.clear();
+    
     // Clear browser history and redirect to home
     window.history.replaceState(null, '', '/home');
     window.location.href = '/home';

@@ -140,11 +140,14 @@ export default function HomeAuth() {
         ) : (
           <input
             type="text"
-            placeholder="Enter your 6-digit account number"
+            placeholder="Enter your 6-character account number"
             value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6);
+              setAccountNumber(value);
+            }}
             maxLength={6}
-            className="w-full rounded px-3 py-2 text-black text-center tracking-widest"
+            className="w-full rounded px-3 py-2 text-black text-center tracking-widest font-mono"
             required
           />
         )}
