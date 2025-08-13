@@ -220,6 +220,8 @@ function MemberCheckin() {
 
                     // Persist basic context
                     if (otpEmail) localStorage.setItem('member_email', otpEmail)
+                    // Add this line to mark recent authentication
+                    localStorage.setItem('last_auth_time', Date.now().toString())
                     if (!firstId) {
                       // Try to read household members (cookie first, then token)
                       let me = await apiFetch('/v1/households/me').catch(() => null)

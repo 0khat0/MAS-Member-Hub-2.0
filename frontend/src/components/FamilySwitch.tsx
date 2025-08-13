@@ -31,7 +31,10 @@ export default function FamilySwitch({ onSelect }: Props) {
     apiFetch('/v1/households/me').then(async (r) => {
       clearTimeout(timeoutId)
       if (!r.ok) {
-        setError(`Failed to load: ${r.status}`)
+        // Don't show error for 401 - user might just not be logged in yet
+        if (r.status !== 401) {
+          setError(`Failed to load: ${r.status}`)
+        }
         setLoading(false)
         return
       }
@@ -48,7 +51,10 @@ export default function FamilySwitch({ onSelect }: Props) {
     }).catch((e) => {
       clearTimeout(timeoutId)
       console.error('FamilySwitch API error:', e)
-      setError('Network error - please check connection')
+      // Only show error for network issues, not auth issues
+      if (e.message !== 'Request timeout') {
+        setError('Network error - please check connection')
+      }
       setLoading(false)
     })
 

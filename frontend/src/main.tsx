@@ -54,7 +54,13 @@ function BootstrapGate() {
       try {
         // Skip session probe on admin routes to avoid banner there
         if (!location.pathname.startsWith('/admin')) {
-          await bootstrapSession(6000)
+          // Skip session check if user just completed OTP verification (within last 30 seconds)
+          const lastAuthTime = localStorage.getItem('last_auth_time')
+          const justAuthenticated = lastAuthTime && (Date.now() - parseInt(lastAuthTime)) < 30000
+          
+          if (!justAuthenticated) {
+            await bootstrapSession(6000)
+          }
         }
       } catch (e: any) {
         setError(e?.message || 'failed')
