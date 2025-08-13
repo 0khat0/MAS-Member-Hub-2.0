@@ -420,6 +420,48 @@ def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session
     return {"pendingId": str(household.id), "to": mask_email(email)}
 
 
+@router.post("/auth/login-account")
+def login_account(body: StartAuthAccountBody, response: Response, db: Session = Depends(get_db)):
+    """Direct login with account code - no OTP required"""
+    from sqlalchemy import select, func
+    from models import Household, Member
+    
+    # Validate account number format
+    account_number = body.accountNumber.strip().upper()
+    if not is_valid_account_code(account_number):
+        raise HTTPException(status_code=422, detail="Account number must be exactly 5 characters from A-Z and 2-9")
+    
+    # Find household by account number (case-insensitive)
+    household = db.execute(
+        select(Household).where(func.upper(Household.household_code) == account_number)
+    ).scalar_one_or_none()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Create session directly
+    token = _create_session_cookie(response, str(household.id))
+    response.headers["Cache-Control"] = "no-store"
+    
+    # Get household members
+    members = db.execute(select(Member).where(Member.household_id == household.id)).scalars().all()
+    
+    return JSONResponse(
+        {
+            "ok": True,
+            "session_token": token,
+            "householdId": str(household.id),
+            "ownerEmail": household.owner_email,
+            "members": [
+                {"id": str(m.id), "name": m.name}
+                for m in members
+            ],
+            "householdCode": household.household_code,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.post("/auth/logout")
 def logout_auth(response: Response):
     """Clear session cookie on logout"""

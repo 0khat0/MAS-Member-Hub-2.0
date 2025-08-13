@@ -53,8 +53,7 @@ function AdminDashboard() {
   const [isLoadingManual, setIsLoadingManual] = useState(false);
   const [manualError, setManualError] = useState("");
   const [manualSuccess, setManualSuccess] = useState("");
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [lastLookupTime, setLastLookupTime] = useState<Date | null>(null);
+
 
   // Loading states
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -323,7 +322,6 @@ function AdminDashboard() {
       const data = await response.json();
       setManualHousehold(data);
       setManualSuccess(`Found account ${data.household_code} with ${data.member_count} members`);
-      setLastLookupTime(new Date());
     } catch (error) {
       console.error('Error looking up account:', error);
       setManualError("Failed to lookup account. Please try again.");
@@ -377,7 +375,6 @@ function AdminDashboard() {
     setManualHousehold(null);
     setManualError("");
     setManualSuccess("");
-    setLastLookupTime(null);
   };
 
   const toggleFamilyExpansion = (checkinId: string) => {
@@ -548,14 +545,10 @@ function AdminDashboard() {
       }
     }, 2000); // 2 seconds
     
-    // Update current time every minute
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // 1 minute
+
     
     return () => {
       clearInterval(refreshInterval);
-      clearInterval(timeInterval);
       delete (window as any).refreshAdminStats;
       delete (window as any).refreshAdminCheckins;
       delete (window as any).refreshAdminDashboard;
@@ -675,11 +668,6 @@ function AdminDashboard() {
                       Account #{manualHousehold.household_code}
                     </h3>
                     <p className="text-gray-400 text-sm">{manualHousehold.owner_email}</p>
-                    {lastLookupTime && (
-                      <p className="text-gray-500 text-xs mt-1">
-                        Looked up at {lastLookupTime.toLocaleTimeString()}
-                      </p>
-                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-blue-400">{manualHousehold.member_count}</div>
@@ -721,7 +709,7 @@ function AdminDashboard() {
                             : 'bg-blue-600 hover:bg-blue-700 text-white'
                         }`}
                       >
-                        {member.already_checked_in ? 'Checked In' : `Check In (${currentTime.toLocaleTimeString()})`}
+                        {member.already_checked_in ? 'Checked In' : 'Check In'}
                       </button>
                     </div>
                   ))}

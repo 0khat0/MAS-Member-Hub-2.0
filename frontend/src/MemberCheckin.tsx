@@ -405,7 +405,7 @@ function MemberCheckin() {
                     }`}
                     onClick={() => setCheckinByName(true)}
                   >
-                    Sign In with Code
+                    Log In
                   </button>
                 </div>
              </motion.div>
@@ -684,8 +684,8 @@ function MemberCheckin() {
                   setMessage("");
                   
                   try {
-                    // Login with account code
-                    const res = await apiFetch('/v1/auth/start-account', {
+                    // Direct login with account code (no OTP)
+                    const res = await apiFetch('/v1/auth/login-account', {
                       method: 'POST',
                       body: JSON.stringify({ accountNumber: formName.trim() })
                     });
@@ -698,9 +698,35 @@ function MemberCheckin() {
                     }
                     
                     const data = await res.json();
-                    setOtpPendingId(data.pendingId);
-                    setOtpEmailMasked(data.to);
-                    setOtpEmail(data.to);
+                    
+                    // Store household information
+                    if (data.householdCode) {
+                      localStorage.setItem('household_code', data.householdCode);
+                    }
+                    if (data.ownerEmail) {
+                      localStorage.setItem('member_email', data.ownerEmail);
+                    }
+                    if (data.members && data.members.length > 0) {
+                      localStorage.setItem('member_id', data.members[0].id);
+                      if (data.members.length > 1) {
+                        localStorage.setItem('family_members', JSON.stringify(data.members.map((m: any) => m.name)));
+                      }
+                    }
+                    
+                    // Mark recent authentication
+                    localStorage.setItem('last_auth_time', Date.now().toString());
+                    
+                    // Redirect to profile
+                    if (data.members && data.members.length > 1) {
+                      // Family - redirect to family profile
+                      window.location.href = `/profile?email=${encodeURIComponent(data.ownerEmail)}`;
+                    } else if (data.members && data.members.length === 1) {
+                      // Single member - redirect to profile
+                      window.location.href = `/profile?id=${data.members[0].id}`;
+                    } else {
+                      // No members yet - redirect to profile
+                      window.location.href = '/profile';
+                    }
                     
                   } catch (error) {
                     console.error("Login error:", error);
@@ -731,7 +757,7 @@ function MemberCheckin() {
                     whileTap={{ scale: 0.98 }}
                     type="submit"
                   >
-                    Sign In
+                    Log In
                   </motion.button>
                 </div>
               </motion.form>
@@ -805,7 +831,7 @@ function MemberCheckin() {
               >
                 <div className="p-6 border-b border-white/10">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">Sign In Help</h2>
+                    <h2 className="text-lg font-semibold text-white">Login Help</h2>
                     <button
                       onClick={() => setShowLoginInfo(false)}
                       className="text-white/60 hover:text-white transition-colors"
@@ -820,7 +846,7 @@ function MemberCheckin() {
                 <div className="p-6">
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-white font-medium mb-2">🔐 Sign In with Account Code</h3>
+                      <h3 className="text-white font-medium mb-2">🔐 Login with Account Code</h3>
                       <p className="text-white/70 text-sm">
                         Enter your 5-character account code to access your membership.
                       </p>
