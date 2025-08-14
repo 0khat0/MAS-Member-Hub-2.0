@@ -70,7 +70,7 @@ export default function InlineAuthGate() {
               placeholder="Member name (optional)"
               value={name}
               onChange={(e) => handleNameInputChange(e, setName)}
-              className="w-full rounded px-3 py-2 text-black"
+              className="w-full rounded-lg px-4 py-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
             />
             <input
               type="email"
@@ -78,11 +78,11 @@ export default function InlineAuthGate() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded px-3 py-2 text-black"
+              className="w-full rounded-lg px-4 py-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
             />
             {error && <div className="text-red-400 text-sm">{error}</div>}
             <div className="flex gap-2">
-              <button disabled={loading || !email} className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded px-4 py-2">
+              <button disabled={loading || !email} className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg px-4 py-3 font-medium text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed">
                 {loading ? 'Sending…' : 'Create account'}
               </button>
             </div>
