@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { isValidAccountCode } from './utils';
+import { handleNameInputChange } from './utils/nameUtils';
 
 interface DailyCheckin {
   checkin_id: string;
@@ -836,7 +837,7 @@ function AdminDashboard() {
                                   <input
                                     type="text"
                                     value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
+                                    onChange={(e) => handleNameInputChange(e, setEditName)}
                                     className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     disabled={isUpdatingMember}
                                   />

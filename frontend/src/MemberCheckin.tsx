@@ -5,6 +5,7 @@ import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime, r
 import AuthOTP from "./components/AuthOTP";
 import { apiFetch, bootstrapSession } from './lib/session'
 import { afterOtpVerified } from './lib/afterOtpVerified'
+import { handleNameInputChange } from './utils/nameUtils';
 
 function getDailyMuayThaiMessage() {
   const messages = [
@@ -606,7 +607,7 @@ function MemberCheckin() {
                       placeholder="Enter member full name" 
                       type="text" 
                       value={formName} 
-                      onChange={e => setFormName(e.target.value)} 
+                      onChange={e => handleNameInputChange(e, setFormName)} 
                       required 
                     />
                   </motion.div>
@@ -614,12 +615,12 @@ function MemberCheckin() {
                                      {/* Family member fields - only show if family mode is active */}
                    {isFamily && familyNames.map((name, idx) => (
                      <motion.div key={idx} className="flex items-center gap-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.1 }}>
-                       <input 
+                                              <input 
                          className="min-w-0 flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-all duration-200" 
-                          placeholder="Enter member full name" 
+                         placeholder="Enter member full name" 
                          type="text" 
                          value={name} 
-                         onChange={e => handleFamilyNameChange(idx, e.target.value)} 
+                         onChange={e => handleNameInputChange(e, (value) => handleFamilyNameChange(idx, value))} 
                          required 
                        />
                        <button 

@@ -3,6 +3,7 @@ import { getCache, setCache } from './lib/cache';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern, getDailyMuayThaiMessage } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
+import { handleNameInputChange } from './utils/nameUtils';
 
 interface MemberStats {
   monthly_check_ins: number;
@@ -994,7 +995,7 @@ function MemberStats({ memberId }: Props) {
                   <input
                     type="text"
                     value={editName}
-                    onChange={e => setEditName(e.target.value)}
+                    onChange={e => handleNameInputChange(e, setEditName)}
                     className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
                     placeholder="Enter member full name"
                     required
@@ -1210,7 +1211,7 @@ function MemberStats({ memberId }: Props) {
                   <input
                     type="text"
                     value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
+                    onChange={(e) => handleNameInputChange(e, setNewMemberName)}
                     className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="Enter member name"
                     autoFocus

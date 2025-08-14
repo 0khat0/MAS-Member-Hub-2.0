@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/session'
 import AuthOTP from './AuthOTP'
 import { afterOtpVerified } from '../lib/afterOtpVerified'
+import { handleNameInputChange } from '../utils/nameUtils';
 
 export default function InlineAuthGate() {
   const [show, setShow] = useState(false)
@@ -68,7 +69,7 @@ export default function InlineAuthGate() {
               type="text"
               placeholder="Member name (optional)"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameInputChange(e, setName)}
               className="w-full rounded px-3 py-2 text-black"
             />
             <input

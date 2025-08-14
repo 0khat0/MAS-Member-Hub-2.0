@@ -970,10 +970,14 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     if not email or not name:
         raise HTTPException(status_code=400, detail="Email and name are required")
     
+    # Capitalize the name before processing
+    from util import capitalize_name
+    capitalized_name = capitalize_name(name)
+    
     # Check if member already exists (not soft-deleted)
     existing = db.query(models.Member).filter(
         models.Member.email == email,
-        models.Member.name == name,
+        models.Member.name == capitalized_name,
         models.Member.deleted_at.is_(None)
     ).first()
     
@@ -988,7 +992,7 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
         if not existing_barcode:
             break
     
-    member = models.Member(email=email, name=name, barcode=barcode)
+    member = models.Member(email=email, name=capitalized_name, barcode=barcode)
     db.add(member)
     db.commit()
     db.refresh(member)
@@ -996,7 +1000,7 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     # Update metrics
     MEMBER_COUNT.inc()
     
-    logger.info("Member created", member_id=str(member.id), email=email, name=name)
+    logger.info("Member created", member_id=str(member.id), email=email, name=capitalized_name)
     
     return models.MemberOut.model_validate(member)
 
@@ -1010,10 +1014,14 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
     if not email or not name:
         raise HTTPException(status_code=400, detail="Email and name are required")
     
+    # Capitalize the name before processing
+    from util import capitalize_name
+    capitalized_name = capitalize_name(name)
+    
     # Check if member already exists (not soft-deleted)
     existing = db.query(models.Member).filter(
         models.Member.email == email,
-        models.Member.name == name,
+        models.Member.name == capitalized_name,
         models.Member.deleted_at.is_(None)
     ).first()
     
@@ -1032,7 +1040,7 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
         if not existing_barcode:
             break
     
-    member = models.Member(email=email, name=name, barcode=barcode)
+    member = models.Member(email=email, name=capitalized_name, barcode=barcode)
     db.add(member)
     db.commit()
     db.refresh(member)
@@ -1040,7 +1048,7 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
     # Update metrics
     MEMBER_COUNT.inc()
     
-    logger.info("Member registered (no check-in)", member_id=str(member.id), email=email, name=name)
+    logger.info("Member registered (no check-in)", member_id=str(member.id), email=email, name=capitalized_name)
     
     return {
         "message": "Registration successful! Welcome to MAS Academy.",
@@ -1075,6 +1083,10 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
     # Create all family members
     created_members = []
     for member_info in members:
+        # Capitalize the name before processing
+        from util import capitalize_name
+        capitalized_name = capitalize_name(member_info.name)
+        
         # Generate unique barcode for each family member
         while True:
             barcode = generate_barcode()
@@ -1083,7 +1095,7 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
             if not existing_barcode:
                 break
         
-        member = models.Member(email=email, name=member_info.name, barcode=barcode)
+        member = models.Member(email=email, name=capitalized_name, barcode=barcode)
         db.add(member)
         created_members.append(member)
     
@@ -1437,8 +1449,12 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
+    # Capitalize the name before updating
+    from util import capitalize_name
+    capitalized_name = capitalize_name(update.name)
+    
     # Update fields
-    setattr(member, 'name', update.name)
+    setattr(member, 'name', capitalized_name)
     
     # If email is being changed, update all family members
     old_email = member.email
