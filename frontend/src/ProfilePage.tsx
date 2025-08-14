@@ -174,28 +174,21 @@ function ProfilePage() {
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       console.log('Attempting to delete family:', memberEmail);
       
-      // Get all family members first
-      const membersResponse = await fetch(`${API_URL}/family/members/${encodeURIComponent(memberEmail)}`);
-      if (!membersResponse.ok) {
-        throw new Error('Failed to fetch family members');
-      }
-      
-      const familyMembers = await membersResponse.json();
-      
-      // Delete each family member
-      for (const member of familyMembers) {
-        const response = await fetch(`${API_URL}/member/${member.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+      // Delete the entire family account (including household and account number)
+      const response = await fetch(`${API_URL}/family/${encodeURIComponent(memberEmail)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-          throw new Error(`Failed to delete ${member.name}: ${errorData.detail || 'Unknown error'}`);
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(`Failed to delete family account: ${errorData.detail || 'Unknown error'}`);
       }
+
+      const result = await response.json();
+      console.log('Family deletion result:', result);
 
       // Clear all data and redirect to home
       clearMemberData();

@@ -1517,6 +1517,62 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
     
     return {"message": "Member deleted successfully"}
 
+@app.delete("/family/{email}")
+@limiter.limit("5/minute")
+async def delete_family(request: Request, email: str, db: Session = Depends(get_db)):
+    """Delete entire family account including household and all members"""
+    # Find the household for this family
+    household = db.query(models.Household).filter(
+        models.Household.owner_email == email
+    ).first()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Family not found")
+    
+    # Get all family members
+    family_members = db.query(models.Member).filter(
+        models.Member.household_id == household.id
+    ).all()
+    
+    if not family_members:
+        raise HTTPException(status_code=404, detail="No family members found")
+    
+    try:
+        # Delete all check-ins for all family members
+        for member in family_members:
+            checkins = db.query(models.Checkin).filter(
+                models.Checkin.member_id == member.id
+            ).all()
+            
+            for checkin in checkins:
+                db.delete(checkin)
+        
+        # Delete all family members
+        for member in family_members:
+            db.delete(member)
+        
+        # Delete the household (this will also delete the account number)
+        db.delete(household)
+        
+        db.commit()
+        
+        logger.info("Family account deleted", 
+                   household_id=str(household.id), 
+                   household_code=household.household_code,
+                   member_count=len(family_members),
+                   email=email)
+        
+        return {
+            "message": f"Family account deleted successfully. Removed {len(family_members)} members and account number {household.household_code}.",
+            "deleted_members": len(family_members),
+            "deleted_household_code": household.household_code
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error("Failed to delete family account", error=str(e), email=email)
+        raise HTTPException(status_code=500, detail="Failed to delete family account")
+
 @app.post("/member/{member_id}/restore")
 @limiter.limit("5/minute")
 async def restore_member(request: Request, member_id: str, db: Session = Depends(get_db)):
