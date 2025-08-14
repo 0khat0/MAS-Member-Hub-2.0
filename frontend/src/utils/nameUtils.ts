@@ -11,10 +11,10 @@ export function capitalizeName(name: string): string {
     return name;
   }
   
-  // Split by spaces and capitalize each word
-  const words = name.trim().split(' ');
+  // Don't trim - preserve all spaces including leading/trailing
+  const words = name.split(' ');
   const capitalizedWords = words.map(word => {
-    if (!word) return word;
+    if (!word) return word; // Preserve empty strings (spaces)
     
     // Handle special cases like "O'Connor", "McDonald", "van der Berg"
     if (word.includes("'") || ['mc', 'mac', 'van', 'von', 'de', 'del', 'da', 'di', 'du', 'le', 'la'].includes(word.toLowerCase())) {
@@ -37,25 +37,23 @@ export function handleNameInputChange(
   setValue: (value: string) => void
 ): void {
   const input = e.target;
-  const cursorPosition = input.selectionStart;
   const value = input.value;
   
-  // Always update the value first to allow normal typing
+  // Update the value immediately to allow normal typing
   setValue(value);
   
-  // Then capitalize in the next tick to avoid interfering with typing
+  // Only capitalize when the user finishes typing (on blur or when they stop typing)
+  // This prevents interference with normal typing including spaces
+  if (value.endsWith(' ') || value === '') {
+    // User just typed a space or cleared the field, don't capitalize yet
+    return;
+  }
+  
+  // Apply capitalization after a short delay
   setTimeout(() => {
     const capitalizedValue = capitalizeName(value);
     if (capitalizedValue !== value) {
       setValue(capitalizedValue);
-      
-      // Restore cursor position after capitalization
-      setTimeout(() => {
-        if (input && input.focus) {
-          input.focus();
-          input.setSelectionRange(cursorPosition, cursorPosition);
-        }
-      }, 0);
     }
-  }, 10);
+  }, 100);
 }
