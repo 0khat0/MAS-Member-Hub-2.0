@@ -40,14 +40,22 @@ export function handleNameInputChange(
   const cursorPosition = input.selectionStart;
   const value = input.value;
   
-  // Capitalize the name
-  const capitalizedValue = capitalizeName(value);
+  // Always update the value first to allow normal typing
+  setValue(value);
   
-  // Update the state
-  setValue(capitalizedValue);
-  
-  // Restore cursor position after React re-renders
+  // Then capitalize in the next tick to avoid interfering with typing
   setTimeout(() => {
-    input.setSelectionRange(cursorPosition, cursorPosition);
-  }, 0);
+    const capitalizedValue = capitalizeName(value);
+    if (capitalizedValue !== value) {
+      setValue(capitalizedValue);
+      
+      // Restore cursor position after capitalization
+      setTimeout(() => {
+        if (input && input.focus) {
+          input.focus();
+          input.setSelectionRange(cursorPosition, cursorPosition);
+        }
+      }, 0);
+    }
+  }, 10);
 }
