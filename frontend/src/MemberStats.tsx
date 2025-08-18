@@ -794,7 +794,10 @@ function MemberStats({ memberId }: Props) {
             }
             
             return qrData ? (
-              <QRCodeGenerator data={qrData} />
+              <QRCodeGenerator 
+                data={qrData} 
+                title={stats?.household_code ? `Account #${stats.household_code}` : "QR Code"} 
+              />
             ) : (
               <div className="text-gray-400">No QR code available</div>
             );
@@ -907,37 +910,32 @@ function MemberStats({ memberId }: Props) {
         ) : null}
         {/* Profile Section */}
         <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
-          <div className="mb-6">
-            {/* Profile Header - Mobile Optimized */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <h2 className="text-2xl font-extrabold text-white">
-                    {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
-                  </h2>
-                </div>
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
               </div>
-              
-              {/* Family Icon - Only show for individual profiles */}
-              {familyMembers.length <= 1 && (
-                <button
-                  type="button"
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-2 self-start sm:self-auto"
-                  onClick={() => setShowAddMemberModal(true)}
-                  title="Family? Become a family"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span className="text-sm font-medium">Family?</span>
-                </button>
-              )}
+              <h2 className="text-2xl font-extrabold text-white">
+                {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
+              </h2>
             </div>
+            
+            {/* Family Icon - Only show for individual profiles */}
+            {familyMembers.length <= 1 && (
+              <button
+                type="button"
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                onClick={() => setShowAddMemberModal(true)}
+                title="Family? Become a family"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="text-sm font-medium">Family?</span>
+              </button>
+            )}
           </div>
           <div className="w-16 h-1 rounded-full bg-gradient-to-r from-red-500 to-red-700 mb-6" />
           {editMode ? (
@@ -1073,26 +1071,7 @@ function MemberStats({ memberId }: Props) {
           {editSuccess && (
               <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-green-700 text-sm">{editSuccess}</div>
           )}
-          
-          {/* Account Number Card - Displayed within Profile Section */}
-          {stats?.household_code && (
-            <div className="mt-6 p-6 bg-gradient-to-r from-blue-600 to-blue-700 border border-blue-500 rounded-xl shadow-lg">
-              <div className="flex items-center justify-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                </div>
-                <div className="text-center">
-                  <div className="text-sm text-white/80 mb-2 font-medium">Your Account Number</div>
-                  <div className="text-4xl font-mono font-bold text-white tracking-wider">
-                    #{stats.household_code}
-                  </div>
-                  <div className="text-xs text-white/70 mt-1">Keep this number handy for quick access</div>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
         
 
