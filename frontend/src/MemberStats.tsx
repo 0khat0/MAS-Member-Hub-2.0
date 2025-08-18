@@ -925,38 +925,43 @@ function MemberStats({ memberId }: Props) {
         ) : null}
         {/* Profile Section */}
         <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-extrabold text-white">
-                {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
-              </h2>
-              {/* Display Account Number prominently */}
-              {stats?.household_code && (
-                <div className="text-lg font-mono text-white/80 ml-2 bg-white/10 px-3 py-1 rounded-lg">
-                  Account #{stats.household_code}
+          <div className="mb-6">
+            {/* Profile Header - Mobile Optimized */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
                 </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <h2 className="text-2xl font-extrabold text-white">
+                    {isFamily ? `${selectedMember?.name || 'Member'}'s Profile` : 'My Profile'}
+                  </h2>
+                  {/* Display Account Number prominently - Mobile Optimized */}
+                  {stats?.household_code && (
+                    <div className="text-lg font-mono text-white bg-gradient-to-r from-red-500/20 to-purple-500/20 border border-red-500/30 px-4 py-2 rounded-lg shadow-lg">
+                      Account #{stats.household_code}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Family Icon - Only show for individual profiles */}
+              {familyMembers.length <= 1 && (
+                <button
+                  type="button"
+                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-2 self-start sm:self-auto"
+                  onClick={() => setShowAddMemberModal(true)}
+                  title="Family? Become a family"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="text-sm font-medium">Family?</span>
+                </button>
               )}
             </div>
-            
-                        {/* Family Icon - Only show for individual profiles */}
-            {familyMembers.length <= 1 && (
-              <button
-                type="button"
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                onClick={() => setShowAddMemberModal(true)}
-                title="Family? Become a family"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span className="text-sm font-medium">Family?</span>
-              </button>
-            )}
           </div>
           <div className="w-16 h-1 rounded-full bg-gradient-to-r from-red-500 to-red-700 mb-6" />
           {editMode ? (
