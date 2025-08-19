@@ -793,10 +793,13 @@ function MemberStats({ memberId }: Props) {
               qrData = stats.barcode;
             }
             
+            // Get account number from stats or localStorage as fallback
+            const accountNumber = stats?.household_code || localStorage.getItem('household_code');
+            
             return qrData ? (
               <QRCodeGenerator 
                 data={qrData} 
-                title={stats?.household_code ? `Account #${stats.household_code}` : "QR Code"} 
+                title={accountNumber ? `Account #${accountNumber}` : "QR Code"} 
               />
             ) : (
               <div className="text-gray-400">No QR code available</div>
