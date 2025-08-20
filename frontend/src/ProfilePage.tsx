@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getMemberId, setMemberId, clearMemberData, reportIssue } from './utils';
+import { clearAppStorage } from './lib/storage';
 import MemberStats from './MemberStats';
 import FamilySwitch from './components/FamilySwitch';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -94,9 +95,9 @@ function ProfilePage() {
       console.error('Logout API call failed:', error);
     }
     
-    // Clear all localStorage data
+    // Clear session data but preserve user preferences like goals
     clearMemberData();
-    localStorage.clear();
+    clearAppStorage();
     
     // Clear browser history and redirect to home
     window.history.replaceState(null, '', '/home');
