@@ -54,6 +54,24 @@ function MemberCheckin() {
   const [otpEmailMasked, setOtpEmailMasked] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
 
+  // Unified error handling function
+  const handleError = (errorMessage: string) => {
+    setStatus("error");
+    setMessage(errorMessage);
+    // Clear any previous messages to prevent duplicates
+    setTimeout(() => {
+      if (status === "error" && message === errorMessage) {
+        setMessage("");
+      }
+    }, 5000); // Auto-clear after 5 seconds
+  };
+
+  // Clear error function
+  const clearError = () => {
+    setStatus("register");
+    setMessage("");
+  };
+
   // Helper to handle name changes
   const handleFamilyNameChange = (idx: number, value: string) => {
     setFamilyNames(names => names.map((n, i) => i === idx ? value : n));
@@ -61,52 +79,53 @@ function MemberCheckin() {
   const addFamilyMember = () => setFamilyNames(names => [...names, ""]);
   const removeFamilyMember = (idx: number) => setFamilyNames(names => names.filter((_, i) => i !== idx));
 
+  // On load, check if user is already logged in
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("member_email");
+    const savedMemberId = localStorage.getItem("member_id");
+    const savedFamilyMembers = localStorage.getItem("family_members");
 
+    // Validate saved member_id if it exists
+    if (savedMemberId && !isValidUUID(savedMemberId)) {
+      localStorage.removeItem("member_id");
+    }
 
-      // On load, check if user is already logged in
-    useEffect(() => {
-      const savedEmail = localStorage.getItem("member_email");
-      const savedMemberId = localStorage.getItem("member_id");
-      const savedFamilyMembers = localStorage.getItem("family_members");
+    if (savedEmail) {
+      setMemberEmail(savedEmail);
 
-      // Validate saved member_id if it exists
-      if (savedMemberId && !isValidUUID(savedMemberId)) {
-        localStorage.removeItem("member_id");
-      }
-
-      if (savedEmail) {
-        setMemberEmail(savedEmail);
-
-        // Check if this is a family
-        if (savedFamilyMembers) {
-          try {
-            const members = JSON.parse(savedFamilyMembers);
-            setFamilyMembers(members);
-            if (members.length > 1) {
-              // Family - just redirect to profile
-              setStatus("success");
-              setMessage("Welcome back! Redirecting to your family profile...");
-              setTimeout(() => {
-                window.location.href = `/profile?email=${encodeURIComponent(savedEmail)}`;
-              }, 1500);
-              return;
-            }
-          } catch (e) {
-            console.error("Error parsing family members:", e);
-            localStorage.removeItem("family_members");
+      // Check if this is a family
+      if (savedFamilyMembers) {
+        try {
+          const members = JSON.parse(savedFamilyMembers);
+          setFamilyMembers(members);
+          if (members.length > 1) {
+            // Family - just redirect to profile
+            setStatus("success");
+            setMessage("Welcome back! Redirecting to your family profile...");
+            setTimeout(() => {
+              window.location.href = `/profile?email=${encodeURIComponent(savedEmail)}`;
+            }, 1500);
+            return;
           }
+        } catch (e) {
+          console.error("Error parsing family members:", e);
+          localStorage.removeItem("family_members");
         }
-
-        // Single member - just redirect to profile
-        setStatus("success");
-        setMessage("Welcome back! Redirecting to your profile...");
-        setTimeout(() => {
-          window.location.href = `/profile?id=${savedMemberId || ''}&email=${encodeURIComponent(savedEmail)}`;
-        }, 1500);
-      } else {
-        setStatus("register");
       }
-    }, []);
+
+      // Single member - just redirect to profile
+      setStatus("success");
+      setMessage("Welcome back! Redirecting to your profile...");
+      setTimeout(() => {
+        window.location.href = `/profile?id=${savedMemberId}`;
+      }, 1500);
+      return;
+    }
+
+    // Not logged in - show registration form
+    setStatus("register");
+    setMessage("");
+  }, []);
 
 
 
@@ -677,7 +696,7 @@ function MemberCheckin() {
                 onSubmit={async (e) => {
                   e.preventDefault();
                   if (!formName.trim()) {
-                    setMessage("Please enter your account code.");
+                    handleError("Please enter your account code.");
                     return;
                   }
                   
@@ -693,8 +712,7 @@ function MemberCheckin() {
                     
                     if (!res.ok) {
                       const errorData = await res.json();
-                      setStatus("error");
-                      setMessage(errorData.detail || "Invalid account code. Please try again.");
+                      handleError(errorData.detail || "Invalid account code. Please try again.");
                       return;
                     }
                     
@@ -731,8 +749,7 @@ function MemberCheckin() {
                     
                   } catch (error) {
                     console.error("Login error:", error);
-                    setStatus("error");
-                    setMessage("Network error. Please try again.");
+                    handleError("Network error. Please try again.");
                   }
                 }}
               >
@@ -797,10 +814,7 @@ function MemberCheckin() {
                 >
                   <p className="text-xl font-semibold text-red-400">✗ {message}</p>
                   <button
-                    onClick={() => {
-                      setStatus("register");
-                      setMessage("");
-                    }}
+                    onClick={clearError}
                     className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                   >
                     Try Again
