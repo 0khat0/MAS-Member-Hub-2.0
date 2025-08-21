@@ -159,7 +159,7 @@ function MemberCheckin() {
         }}
       />
       {/* Unified Main Content, no extra min-h-screen, no overflow-x-hidden, no extra wrappers */}
-      <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-8 space-y-6">
+      <div className="flex flex-col items-center justify-center w-full min-h-screen px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
 
         {/* OTP modal only after Create account */}
@@ -730,11 +730,11 @@ function MemberCheckin() {
                   }
                 }}
               >
-                <div className="glass-card space-y-6 p-6">
-                  <motion.div className="space-y-2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                    <label className="block text-sm font-medium text-white/80 mb-2">Account Code</label>
+                <div className="glass-card space-y-4 p-4 sm:p-6">
+                  <motion.div className="space-y-3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+                    <label className="block text-sm font-medium text-white/80 mb-1 sm:mb-2">Account Code</label>
                     <input 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 text-center tracking-wide font-mono text-lg" 
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 text-center tracking-wide font-mono text-base sm:text-lg" 
                       placeholder="Enter your 5-character account code" 
                       type="text" 
                       value={formName} 
@@ -746,8 +746,8 @@ function MemberCheckin() {
                       required 
                     />
                   </motion.div>
-                                                       <motion.button
-                    className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20"
+                  <motion.button
+                    className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold hover:from-red-500 hover:to-red-400 transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-red-500/20 text-sm sm:text-base"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     type="submit"
