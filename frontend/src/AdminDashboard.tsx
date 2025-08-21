@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { isValidAccountCode } from './utils';
 import { handleNameInputChange } from './utils/nameUtils';
+import { offlineStorage } from './utils/offlineStorage';
+import type { QueuedCheckin } from './utils/offlineStorage';
 
 interface DailyCheckin {
   checkin_id: string;
@@ -55,6 +57,11 @@ function AdminDashboard() {
   const [manualError, setManualError] = useState("");
   const [manualSuccess, setManualSuccess] = useState("");
 
+  // Offline functionality
+  const [queuedCheckins, setQueuedCheckins] = useState<QueuedCheckin[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
 
   // Loading states
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,6 +70,28 @@ function AdminDashboard() {
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Define functions before useEffect
+  
+  // Offline functionality
+  const syncQueuedCheckins = useCallback(async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      const result = await offlineStorage.syncQueuedCheckins();
+      if (result.success > 0) {
+        // Refresh the page to show updated check-ins
+        window.location.reload();
+      }
+      // Reload queued check-ins
+      const queued = await offlineStorage.getQueuedCheckins();
+      setQueuedCheckins(queued);
+    } catch (error) {
+      console.error('Failed to sync queued check-ins:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing]);
+
   const fetchTodayCheckins = useCallback(async () => {
     try {
       setIsRefreshing(true);
@@ -556,6 +585,43 @@ function AdminDashboard() {
     };
   }, []);
 
+  // Offline functionality useEffect
+  useEffect(() => {
+    const updateOnlineStatus = () => {
+      const online = navigator.onLine;
+      setIsOnline(online);
+      
+      if (online) {
+        // Try to sync queued check-ins when coming back online
+        syncQueuedCheckins();
+      }
+    };
+
+    const loadQueuedCheckins = async () => {
+      try {
+        const queued = await offlineStorage.getQueuedCheckins();
+        setQueuedCheckins(queued);
+      } catch (error) {
+        console.error('Failed to load queued check-ins:', error);
+      }
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    // Load initial queued check-ins
+    loadQueuedCheckins();
+    
+    // Set up periodic refresh of queued check-ins
+    const interval = setInterval(loadQueuedCheckins, 10000);
+    
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+      clearInterval(interval);
+    };
+  }, [syncQueuedCheckins]);
+
   // Handle outside click and escape key to close expanded families
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -590,7 +656,37 @@ function AdminDashboard() {
             <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
             <p className="text-white/60">Manage members and monitor check-ins</p>
           </div>
-
+          
+          {/* Offline Status and Queued Check-ins */}
+          <div className="flex items-center space-x-4">
+            {/* Online/Offline Status */}
+            <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
+              isOnline ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className={`text-sm font-medium ${isOnline ? 'text-green-400' : 'text-red-400'}`}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+            
+            {/* Queued Check-ins Badge */}
+            {queuedCheckins.length > 0 && (
+              <div className="flex items-center space-x-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                <span className="text-blue-400 text-sm font-medium">
+                  📱 {queuedCheckins.length} Queued
+                </span>
+                {isOnline && (
+                  <button
+                    onClick={syncQueuedCheckins}
+                    disabled={isSyncing}
+                    className="px-2 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+                  >
+                    {isSyncing ? "🔄" : "Sync"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Manual Check-in Section */}
@@ -719,6 +815,74 @@ function AdminDashboard() {
             )}
           </div>
         </motion.div>
+
+        {/* Queued Check-ins Section */}
+        {queuedCheckins.length > 0 && (
+          <motion.div 
+            className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6 mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.08 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-lg">📱</span>
+              </div>
+              <h2 className="text-xl font-semibold text-blue-400">Queued Check-ins</h2>
+              <span className="ml-auto px-3 py-1 bg-blue-600 text-white text-sm rounded-full font-medium">
+                {queuedCheckins.length} pending
+              </span>
+            </div>
+            
+            <div className="space-y-3 mb-4">
+              {queuedCheckins.slice(0, 10).map((checkin) => (
+                <div key={checkin.id} className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-blue-300 font-mono text-sm">{checkin.barcode}</span>
+                    <span className="text-blue-300/70 text-xs">
+                      {new Date(checkin.timestamp).toLocaleString()}
+                    </span>
+                    {checkin.retryCount > 0 && (
+                      <span className="text-orange-400 text-xs">
+                        Retry {checkin.retryCount}/{checkin.maxRetries}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {queuedCheckins.length > 10 && (
+                <p className="text-blue-300/70 text-sm text-center">
+                  ...and {queuedCheckins.length - 10} more queued check-ins
+                </p>
+              )}
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <div className="text-blue-300/80 text-sm">
+                {isOnline ? "Ready to sync when you click the sync button" : "Will sync automatically when internet returns"}
+              </div>
+              <div className="flex space-x-3">
+                {isOnline && (
+                  <button
+                    onClick={syncQueuedCheckins}
+                    disabled={isSyncing}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                  >
+                    {isSyncing ? "🔄 Syncing..." : "🔄 Sync Now"}
+                  </button>
+                )}
+                <button
+                  onClick={() => offlineStorage.clearAllQueued().then(() => {
+                    setQueuedCheckins([]);
+                  })}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  🗑️ Clear All
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Scanner Navigation */}
         <motion.div 
