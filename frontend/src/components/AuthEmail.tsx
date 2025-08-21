@@ -4,9 +4,10 @@ import { maskEmail } from '../lib/email'
 
 type Props = {
   onPending: (pendingId: string, emailMasked: string, rawEmail: string) => void
+  onSignIn?: () => void
 }
 
-export default function AuthEmail({ onPending }: Props) {
+export default function AuthEmail({ onPending, onSignIn }: Props) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +22,12 @@ export default function AuthEmail({ onPending }: Props) {
         body: JSON.stringify({ email })
       })
       if (!res.ok) {
-        throw new Error(`${res.status}`)
+        if (res.status === 409) {
+          setError('An account with this email already exists. Please sign in instead.')
+        } else {
+          throw new Error(`${res.status}`)
+        }
+        return
       }
       const data = await res.json()
       onPending(data.pendingId, data.to, email.trim().toLowerCase())
@@ -42,7 +48,20 @@ export default function AuthEmail({ onPending }: Props) {
         required
         className="w-full rounded px-3 py-2 text-black"
       />
-      {error && <div className="text-red-400 text-sm">{error}</div>}
+      {error && (
+        <div className="space-y-2">
+          <div className="text-red-400 text-sm">{error}</div>
+          {error.includes('already exists') && onSignIn && (
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="text-blue-400 hover:text-blue-300 text-sm underline"
+            >
+              Sign in instead
+            </button>
+          )}
+        </div>
+      )}
       <button disabled={loading} className="bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded px-4 py-2">
         {loading ? 'Sending…' : 'Send code'}
       </button>

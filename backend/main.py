@@ -357,8 +357,17 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
 
     email = str(body.email).strip().lower()
 
+    # Check if account already exists
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-    if not existing:
+    if existing:
+        # Account exists - check if email is verified
+        if existing.email_verified_at:
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+        else:
+            # Email not verified - allow them to continue with verification
+            pass
+    else:
+        # New account - create household
         existing = Household(owner_email=email)
         db.add(existing)
         db.flush()

@@ -6,9 +6,10 @@ type Props = {
   emailMasked: string
   rawEmail: string
   onVerified: (payload: any) => void
+  onBack: () => void
 }
 
-export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified }: Props) {
+export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, onBack }: Props) {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
@@ -56,7 +57,18 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified }
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-gray-300">We sent a code to {emailMasked}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-300">We sent a code to {emailMasked}</div>
+        <button
+          onClick={onBack}
+          className="text-gray-400 hover:text-white transition-colors p-1"
+          title="Go back to change email"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
       <form onSubmit={submit} className="space-y-3">
         <input
           inputMode="numeric"
