@@ -60,11 +60,17 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-300">We sent a code to {emailMasked}</div>
         <button
-          onClick={onBack}
-          className="text-gray-400 hover:text-white transition-colors p-1"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('Close button clicked')
+            onBack()
+          }}
+          className="text-gray-400 hover:text-white transition-colors p-3 rounded hover:bg-gray-700 z-10 relative cursor-pointer border border-gray-600 hover:border-gray-400"
           title="Go back to change email"
+          type="button"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

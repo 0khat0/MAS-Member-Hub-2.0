@@ -49,7 +49,10 @@ export default function AuthFlow() {
               setStep('done')
             })
           }}
-          onBack={() => setStep('email')}
+          onBack={() => {
+            console.log('Going back to email step')
+            setStep('email')
+          }}
         />
       </div>
     )
@@ -57,7 +60,8 @@ export default function AuthFlow() {
   return (
     <div className="max-w-sm mx-auto p-4 space-y-3">
       <h2 className="text-xl font-semibold">Welcome</h2>
-      <div className="text-sm text-gray-400">Household: {me?.householdCode}</div>
+      <div className="text-sm text-gray-400">Your Account Number: <span className="font-mono text-white">{me?.householdCode}</span></div>
+      <div className="text-xs text-gray-500">Save this number for future sign-ins!</div>
       <FamilySwitch onSelect={(m) => { localStorage.setItem('active_member', JSON.stringify(m)); }} />
     </div>
   )

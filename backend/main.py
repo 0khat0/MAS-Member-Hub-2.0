@@ -972,7 +972,7 @@ async def get_checkin_stats(request: Request, db: Session = Depends(get_db)):
 @app.post("/member")
 @limiter.limit("10/minute")
 async def create_member(request: Request, member_data: dict, db: Session = Depends(get_db)):
-    """Create a new member"""
+    """Create a new member using the household system"""
     email = member_data.get("email")
     name = member_data.get("name")
     
@@ -983,15 +983,24 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     from util import capitalize_name
     capitalized_name = capitalize_name(name)
     
-    # Check if member already exists (not soft-deleted)
-    existing = db.query(models.Member).filter(
-        models.Member.email == email,
-        models.Member.name == capitalized_name,
-        models.Member.deleted_at.is_(None)
-    ).first()
+    # Check if household already exists for this email
+    existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
-    if existing:
-        raise HTTPException(status_code=409, detail="Member already exists")
+    if existing_household:
+        # Check if member already exists in this household
+        existing_member = db.query(models.Member).filter(
+            models.Member.household_id == existing_household.id,
+            models.Member.name == capitalized_name,
+            models.Member.deleted_at.is_(None)
+        ).first()
+        
+        if existing_member:
+            raise HTTPException(status_code=409, detail="Member already exists in this household")
+    else:
+        # Create new household for this email
+        existing_household = models.Household(owner_email=email)
+        db.add(existing_household)
+        db.flush()  # Get the ID without committing
     
     # Generate unique barcode
     while True:
@@ -1001,7 +1010,13 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
         if not existing_barcode:
             break
     
-    member = models.Member(email=email, name=capitalized_name, barcode=barcode)
+    # Create member associated with the household
+    member = models.Member(
+        email=email, 
+        name=capitalized_name, 
+        barcode=barcode,
+        household_id=existing_household.id
+    )
     db.add(member)
     db.commit()
     db.refresh(member)
@@ -1009,14 +1024,14 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     # Update metrics
     MEMBER_COUNT.inc()
     
-    logger.info("Member created", member_id=str(member.id), email=email, name=capitalized_name)
+    logger.info("Member created with household", member_id=str(member.id), email=email, name=capitalized_name, household_id=str(existing_household.id))
     
     return models.MemberOut.model_validate(member)
 
 @app.post("/member/register-only")
 @limiter.limit("10/minute")
 async def register_member_only(request: Request, member_data: dict, db: Session = Depends(get_db)):
-    """Register a new member without checking them in"""
+    """Register a new member without checking them in using the household system"""
     email = member_data.get("email")
     name = member_data.get("name")
     
@@ -1027,20 +1042,29 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
     from util import capitalize_name
     capitalized_name = capitalize_name(name)
     
-    # Check if member already exists (not soft-deleted)
-    existing = db.query(models.Member).filter(
-        models.Member.email == email,
-        models.Member.name == capitalized_name,
-        models.Member.deleted_at.is_(None)
-    ).first()
+    # Check if household already exists for this email
+    existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
-    if existing:
-        # Return existing member instead of error for better UX
-        return {
-            "message": "Welcome back! Redirecting to your profile.",
-            "member": models.MemberOut.model_validate(existing),
-            "is_existing": True
-        }
+    if existing_household:
+        # Check if member already exists in this household
+        existing_member = db.query(models.Member).filter(
+            models.Member.household_id == existing_household.id,
+            models.Member.name == capitalized_name,
+            models.Member.deleted_at.is_(None)
+        ).first()
+        
+        if existing_member:
+            # Return existing member instead of error for better UX
+            return {
+                "message": "Welcome back! Redirecting to your profile.",
+                "member": models.MemberOut.model_validate(existing_member),
+                "is_existing": True
+            }
+    else:
+        # Create new household for this email
+        existing_household = models.Household(owner_email=email)
+        db.add(existing_household)
+        db.flush()  # Get the ID without committing
     
     # Generate unique barcode
     while True:
@@ -1049,7 +1073,13 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
         if not existing_barcode:
             break
     
-    member = models.Member(email=email, name=capitalized_name, barcode=barcode)
+    # Create member associated with the household
+    member = models.Member(
+        email=email, 
+        name=capitalized_name, 
+        barcode=barcode,
+        household_id=existing_household.id
+    )
     db.add(member)
     db.commit()
     db.refresh(member)
@@ -1057,7 +1087,7 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
     # Update metrics
     MEMBER_COUNT.inc()
     
-    logger.info("Member registered (no check-in)", member_id=str(member.id), email=email, name=capitalized_name)
+    logger.info("Member registered with household (no check-in)", member_id=str(member.id), email=email, name=capitalized_name, household_id=str(existing_household.id))
     
     return {
         "message": "Registration successful! Welcome to MAS Academy.",
@@ -1068,26 +1098,35 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
 @app.post("/family/register")
 @limiter.limit("10/minute")
 async def register_family(request: Request, family_data: models.FamilyRegistration, db: Session = Depends(get_db)):
-    """Register multiple family members with one email (no automatic check-in)"""
+    """Register multiple family members with one email using the household system (no automatic check-in)"""
     email = family_data.email
     members = family_data.members
     
     if not email or not members:
         raise HTTPException(status_code=400, detail="Email and at least one member are required")
     
-    # Check if any member already exists (not soft-deleted)
-    existing_members = []
-    for member_info in members:
-        existing = db.query(models.Member).filter(
-            models.Member.email == email,
-            models.Member.name == member_info.name,
-            models.Member.deleted_at.is_(None)
-        ).first()
-        if existing:
-            existing_members.append(member_info.name)
+    # Check if household already exists for this email
+    existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
-    if existing_members:
-        raise HTTPException(status_code=409, detail=f"Members already exist: {', '.join(existing_members)}")
+    if existing_household:
+        # Check if any member already exists in this household
+        existing_members = []
+        for member_info in members:
+            existing = db.query(models.Member).filter(
+                models.Member.household_id == existing_household.id,
+                models.Member.name == member_info.name,
+                models.Member.deleted_at.is_(None)
+            ).first()
+            if existing:
+                existing_members.append(member_info.name)
+        
+        if existing_members:
+            raise HTTPException(status_code=409, detail=f"Members already exist in this household: {', '.join(existing_members)}")
+    else:
+        # Create new household for this email
+        existing_household = models.Household(owner_email=email)
+        db.add(existing_household)
+        db.flush()  # Get the ID without committing
     
     # Create all family members
     created_members = []
@@ -1104,18 +1143,25 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
             if not existing_barcode:
                 break
         
-        member = models.Member(email=email, name=capitalized_name, barcode=barcode)
+        # Create member associated with the household
+        member = models.Member(
+            email=email, 
+            name=capitalized_name, 
+            barcode=barcode,
+            household_id=existing_household.id
+        )
         db.add(member)
         created_members.append(member)
     
     db.commit()
     
-    logger.info("Family registered successfully", email=email, member_count=len(members))
+    logger.info("Family registered successfully with household", email=email, member_count=len(members), household_id=str(existing_household.id))
     
     return {
         "message": f"Family registered successfully. {len(members)} members added.",
         "members": [models.MemberOut.model_validate(m) for m in created_members],
-        "member_ids": [str(m.id) for m in created_members]  # NEW: include member_ids for frontend
+        "member_ids": [str(m.id) for m in created_members],  # NEW: include member_ids for frontend
+        "household_code": existing_household.household_code  # Include the account number
     }
 
 @app.get("/family/members/{email}")

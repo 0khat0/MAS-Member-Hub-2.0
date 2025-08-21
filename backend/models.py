@@ -48,7 +48,7 @@ class Member(Base):
         Index('idx_member_email_active', 'email', 'active'),
         Index('idx_member_created_active', 'created_at', 'active'),
         Index('idx_member_email_deleted', 'email', 'deleted_at'),  # For family queries
-        Index('idx_member_household_name_unique', 'household_id', 'name', unique=True),  # Prevent duplicate names per household
+        # Names are NOT unique - multiple family members can have the same name
     )
 
 
