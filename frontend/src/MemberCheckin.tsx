@@ -160,30 +160,7 @@ function MemberCheckin() {
       />
       {/* Unified Main Content, no extra min-h-screen, no overflow-x-hidden, no extra wrappers */}
       <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-8 space-y-6">
-        {/* Mobile-friendly error display */}
-        {status === "error" && (
-          <motion.div
-            className="w-full max-w-md"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <div className="glass-card p-6 text-center">
-              <div className="text-red-400 text-2xl mb-2">⚠️</div>
-              <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
-              <p className="text-white/70 mb-4">{message}</p>
-              <button
-                onClick={() => {
-                  setStatus("register");
-                  setMessage("");
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Try Again
-              </button>
-            </div>
-          </motion.div>
-        )}
+
 
         {/* OTP modal only after Create account */}
         {otpPendingId && (
@@ -783,9 +760,9 @@ function MemberCheckin() {
           </>
         )}
 
-        {/* Loading and Error States */}
+        {/* Loading State */}
         <AnimatePresence>
-          {(status === "loading" || status === "error") && (
+          {status === "loading" && (
             <motion.div 
               className="w-full max-w-md space-y-4"
               initial={{ opacity: 0, y: 20 }}
@@ -793,34 +770,43 @@ function MemberCheckin() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {status === "loading" && (
-                <motion.div 
-                  className="glass-card flex flex-col items-center p-6"
-                  animate={{ scale: [1, 1.02, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+              <motion.div 
+                className="glass-card flex flex-col items-center p-6"
+                animate={{ scale: [1, 1.02, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-red-500 mb-4"></div>
+                <p className="text-xl font-medium text-white/90">
+                  {"Processing..."}
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error State */}
+        <AnimatePresence>
+          {status === "error" && (
+            <motion.div
+              className="w-full max-w-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <div className="glass-card p-6 text-center">
+                <div className="text-red-400 text-2xl mb-2">⚠️</div>
+                <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
+                <p className="text-white/70 mb-4">{message}</p>
+                <button
+                  onClick={() => {
+                    setStatus("register");
+                    setMessage("");
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-red-500 mb-4"></div>
-                  <p className="text-xl font-medium text-white/90">
-                    {"Processing..."}
-                  </p>
-                </motion.div>
-              )}
-              {status === "error" && (
-                <motion.div 
-                  className="glass-card bg-red-500/10 p-6 text-center"
-                  initial={{ scale: 0.9 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  <p className="text-xl font-semibold text-red-400">✗ {message}</p>
-                  <button
-                    onClick={clearError}
-                    className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Try Again
-                  </button>
-                </motion.div>
-              )}
+                  Try Again
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
