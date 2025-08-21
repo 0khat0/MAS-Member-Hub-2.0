@@ -357,21 +357,50 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
 
     email = str(body.email).strip().lower()
 
-    # Check if account already exists
+    # Check if account already exists - REGISTRATION IS NOT ALLOWED FOR EXISTING ACCOUNTS
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
     if existing:
-        # Account exists - check if email is verified
-        if existing.email_verified_at:
-            raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
-        else:
-            # Email not verified - allow them to continue with verification
-            pass
-    else:
-        # New account - create household
-        existing = Household(owner_email=email)
-        db.add(existing)
-        db.flush()
+        # Account exists - REGISTRATION NOT ALLOWED, user must sign in
+        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+    
+    # Only create new accounts - this is the registration endpoint
+    new_household = Household(owner_email=email)
+    db.add(new_household)
+    db.flush()
 
+    rl_key = f"{request.client.host}:{email}"
+    if not rate_limit_ok(rl_key):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
+
+    code = generate_otp()
+    new_household.email_verification_token_hash = hash_token(code)
+    new_household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
+    db.add(new_household)
+    db.commit()
+
+    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
+    send_email(to=email, subject="Your MAS verification code", html=html)
+
+    return {"pendingId": str(new_household.id), "to": mask_email(email)}
+
+
+@router.post("/auth/signin")
+def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_db)):
+    """Sign in with existing email - sends OTP for verification"""
+    from sqlalchemy import select
+    from models import Household
+    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
+    from emails.sender import send_email
+
+    email = str(body.email).strip().lower()
+
+    # Check if account exists - SIGN IN ONLY FOR EXISTING ACCOUNTS
+    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
+    if not existing:
+        # Account doesn't exist - user must register first
+        raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
+    
+    # Account exists - send OTP for sign in
     rl_key = f"{request.client.host}:{email}"
     if not rate_limit_ok(rl_key):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")

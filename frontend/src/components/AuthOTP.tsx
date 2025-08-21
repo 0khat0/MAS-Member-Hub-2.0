@@ -7,9 +7,10 @@ type Props = {
   rawEmail: string
   onVerified: (payload: any) => void
   onBack: () => void
+  onCancel: () => void
 }
 
-export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, onBack }: Props) {
+export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, onBack, onCancel }: Props) {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
@@ -63,11 +64,11 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            console.log('Close button clicked')
-            onBack()
+            console.log('Close button clicked - cancelling auth')
+            onCancel()
           }}
           className="text-gray-400 hover:text-white transition-colors p-3 rounded hover:bg-gray-700 z-10 relative cursor-pointer border border-gray-600 hover:border-gray-400"
-          title="Go back to change email"
+          title="Cancel authentication"
           type="button"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
