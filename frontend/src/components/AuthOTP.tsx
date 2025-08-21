@@ -8,13 +8,26 @@ type Props = {
   onVerified: (payload: any) => void
   onBack: () => void
   onCancel: () => void
+  isSignIn?: boolean
 }
 
-export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, onBack, onCancel }: Props) {
+export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, onBack, onCancel, isSignIn = false }: Props) {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  // Create a local cancel handler to ensure it's always a function
+  const handleCancel = () => {
+    console.log('Cancel handler called')
+    console.log('onCancel type:', typeof onCancel)
+    console.log('onCancel value:', onCancel)
+    if (typeof onCancel === 'function') {
+      onCancel()
+    } else {
+      console.error('onCancel is not a function:', onCancel)
+    }
+  }
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -44,7 +57,9 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   const resend = async () => {
     setError(null)
     try {
-      const res = await apiFetch('/v1/auth/start', { method: 'POST', body: JSON.stringify({ email: rawEmail }) })
+      // Use the appropriate endpoint based on whether this is sign-in or registration
+      const endpoint = isSignIn ? '/v1/auth/signin' : '/v1/auth/start'
+      const res = await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ email: rawEmail }) })
       if (!res.ok) {
         if (res.status === 429) setError('Please wait before requesting another code.')
         else setError('Failed to resend code.')
@@ -65,7 +80,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
             e.preventDefault()
             e.stopPropagation()
             console.log('Close button clicked - cancelling auth')
-            onCancel()
+            handleCancel()
           }}
           className="text-gray-400 hover:text-white transition-colors p-3 rounded hover:bg-gray-700 z-10 relative cursor-pointer border border-gray-600 hover:border-gray-400"
           title="Cancel authentication"

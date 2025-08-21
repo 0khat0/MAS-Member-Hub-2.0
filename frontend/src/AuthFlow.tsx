@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import AuthEmail from './components/AuthEmail'
 import AuthOTP from './components/AuthOTP'
 import FamilySwitch from './components/FamilySwitch'
@@ -12,6 +12,19 @@ export default function AuthFlow() {
   const [me, setMe] = useState<any | null>(null)
   const [isSignIn, setIsSignIn] = useState(false)
   const [showAuth, setShowAuth] = useState(true)
+
+  // Create a stable cancel function
+  const handleCancel = useCallback(() => {
+    console.log('Cancelling entire auth flow - function called')
+    setShowAuth(false)
+    // Reset all state
+    setStep('email')
+    setPendingId('')
+    setEmailMasked('')
+    setRawEmail('')
+    setMe(null)
+    setIsSignIn(false)
+  }, [])
 
   // If auth is cancelled, show nothing (or a message)
   if (!showAuth) {
@@ -69,7 +82,7 @@ export default function AuthFlow() {
         />
         <div className="mt-4 text-center">
           <button
-            onClick={() => setShowAuth(false)}
+            onClick={handleCancel}
             className="text-gray-400 hover:text-gray-300 text-sm underline"
           >
             Cancel
@@ -88,6 +101,7 @@ export default function AuthFlow() {
           pendingId={pendingId} 
           emailMasked={emailMasked} 
           rawEmail={rawEmail} 
+          isSignIn={isSignIn}
           onVerified={async (data) => {
             setMe(data);
             // If no members yet, prompt user to create one immediately
@@ -113,17 +127,7 @@ export default function AuthFlow() {
             console.log('Going back to email step')
             setStep('email')
           }}
-          onCancel={() => {
-            console.log('Cancelling entire auth flow')
-            setShowAuth(false)
-            // Reset all state
-            setStep('email')
-            setPendingId('')
-            setEmailMasked('')
-            setRawEmail('')
-            setMe(null)
-            setIsSignIn(false)
-          }}
+          onCancel={handleCancel}
         />
       </div>
     )
