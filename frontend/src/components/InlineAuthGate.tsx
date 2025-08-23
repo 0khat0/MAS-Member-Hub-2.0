@@ -61,7 +61,16 @@ export default function InlineAuthGate() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-gray-900 border border-gray-700 p-5 text-white shadow-xl">
+      <div className="w-full max-w-sm rounded-lg bg-gray-900 border border-gray-700 p-5 text-white shadow-xl relative">
+        <button
+          onClick={() => setShow(false)}
+          className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-gray-700"
+          title="Close"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         {!pendingId ? (
           <form onSubmit={start} className="space-y-3">
             <h2 className="text-lg font-semibold text-center">Create account</h2>
@@ -90,7 +99,18 @@ export default function InlineAuthGate() {
         ) : (
           <div>
             <h2 className="text-lg font-semibold mb-2 text-center">Enter the code</h2>
-            <AuthOTP pendingId={pendingId} emailMasked={emailMasked} rawEmail={email} onVerified={afterVerify} />
+            <AuthOTP 
+              pendingId={pendingId} 
+              emailMasked={emailMasked} 
+              rawEmail={email} 
+              onBack={() => {
+                setPendingId(null)
+              }}
+              onCancel={() => {
+                setPendingId(null)
+              }}
+              onVerified={afterVerify} 
+            />
           </div>
         )}
       </div>

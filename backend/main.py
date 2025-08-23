@@ -1016,15 +1016,10 @@ async def create_member(request: Request, member_data: dict, db: Session = Depen
     existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
     if existing_household:
-        # Check if member already exists in this household
-        existing_member = db.query(models.Member).filter(
-            models.Member.household_id == existing_household.id,
-            models.Member.name == capitalized_name,
-            models.Member.deleted_at.is_(None)
-        ).first()
-        
-        if existing_member:
-            raise HTTPException(status_code=409, detail="Member already exists in this household")
+        # Names are NOT unique - multiple family members can have the same name
+        # Only check if the exact same member (same name AND same household) already exists
+        # This allows multiple family members with the same name
+        pass
     else:
         # Create new household for this email
         existing_household = models.Household(owner_email=email)
@@ -1075,20 +1070,10 @@ async def register_member_only(request: Request, member_data: dict, db: Session 
     existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
     if existing_household:
-        # Check if member already exists in this household
-        existing_member = db.query(models.Member).filter(
-            models.Member.household_id == existing_household.id,
-            models.Member.name == capitalized_name,
-            models.Member.deleted_at.is_(None)
-        ).first()
-        
-        if existing_member:
-            # Return existing member instead of error for better UX
-            return {
-                "message": "Welcome back! Redirecting to your profile.",
-                "member": models.MemberOut.model_validate(existing_member),
-                "is_existing": True
-            }
+        # Names are NOT unique - multiple family members can have the same name
+        # Always create a new member, even if someone with the same name exists
+        # This allows multiple family members with the same name
+        pass
     else:
         # Create new household for this email
         existing_household = models.Household(owner_email=email)
@@ -1138,19 +1123,10 @@ async def register_family(request: Request, family_data: models.FamilyRegistrati
     existing_household = db.query(models.Household).filter(models.Household.owner_email == email).first()
     
     if existing_household:
-        # Check if any member already exists in this household
-        existing_members = []
-        for member_info in members:
-            existing = db.query(models.Member).filter(
-                models.Member.household_id == existing_household.id,
-                models.Member.name == member_info.name,
-                models.Member.deleted_at.is_(None)
-            ).first()
-            if existing:
-                existing_members.append(member_info.name)
-        
-        if existing_members:
-            raise HTTPException(status_code=409, detail=f"Members already exist in this household: {', '.join(existing_members)}")
+        # Names are NOT unique - multiple family members can have the same name
+        # Always create new members, even if someone with the same name exists
+        # This allows multiple family members with the same name
+        pass
     else:
         # Create new household for this email
         existing_household = models.Household(owner_email=email)
@@ -1709,19 +1685,10 @@ async def add_family_members(request: Request, add_data: dict, db: Session = Dep
     if not household:
         raise HTTPException(status_code=404, detail="Household not found for this family")
     
-    # Check if any new member already exists in this household
-    existing_new_members = []
-    for member_name in new_members:
-        existing = db.query(models.Member).filter(
-            models.Member.household_id == household.id,
-            models.Member.name == member_name,
-            models.Member.deleted_at.is_(None)
-        ).first()
-        if existing:
-            existing_new_members.append(member_name)
-    
-    if existing_new_members:
-        raise HTTPException(status_code=409, detail=f"Members already exist in this family: {', '.join(existing_new_members)}")
+    # Names are NOT unique - multiple family members can have the same name
+    # Always create new members, even if someone with the same name exists
+    # This allows multiple family members with the same name
+    pass
     
     # Add new family members to the same household
     created_members = []

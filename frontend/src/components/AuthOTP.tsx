@@ -19,9 +19,6 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
 
   // Create a local cancel handler to ensure it's always a function
   const handleCancel = () => {
-    console.log('Cancel handler called')
-    console.log('onCancel type:', typeof onCancel)
-    console.log('onCancel value:', onCancel)
     if (typeof onCancel === 'function') {
       onCancel()
     } else {
@@ -79,7 +76,6 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            console.log('Close button clicked - cancelling auth')
             handleCancel()
           }}
           className="text-gray-400 hover:text-white transition-colors p-3 rounded hover:bg-gray-700 z-10 relative cursor-pointer border border-gray-600 hover:border-gray-400"

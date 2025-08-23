@@ -171,6 +171,14 @@ function MemberCheckin() {
                 pendingId={otpPendingId}
                 emailMasked={otpEmailMasked}
                 rawEmail={otpEmail}
+                onBack={() => {
+                  setOtpPendingId(null)
+                  setStatus('register')
+                }}
+                onCancel={() => {
+                  setOtpPendingId(null)
+                  setStatus('register')
+                }}
                 onVerified={async (verifyPayload: any) => {
                   const sessionToken: string | undefined = verifyPayload?.session_token
                   try {

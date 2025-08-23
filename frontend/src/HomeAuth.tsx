@@ -91,7 +91,18 @@ export default function HomeAuth() {
     return (
       <div className="max-w-sm mx-auto p-4 space-y-3">
         <h2 className="text-xl font-semibold">Enter the code</h2>
-        <AuthOTP pendingId={pendingId} emailMasked={emailMasked} rawEmail={email} onVerified={afterVerify} />
+        <AuthOTP 
+          pendingId={pendingId} 
+          emailMasked={emailMasked} 
+          rawEmail={email} 
+          onBack={() => {
+            setPendingId(null)
+          }}
+          onCancel={() => {
+            setPendingId(null)
+          }}
+          onVerified={afterVerify} 
+        />
       </div>
     )
   }
