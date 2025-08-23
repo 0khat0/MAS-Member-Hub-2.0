@@ -362,15 +362,17 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
     if existing:
         # Check if this is a pending verification that was never completed
         if existing.email_verification_token_hash and existing.email_verification_expires_at:
-            # If the pending verification has expired, clean it up and allow new registration
-            if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
-                # Expired verification - clean up and allow new registration
+            # If the pending verification has expired OR is older than 1 hour, clean it up and allow new registration
+            # This handles cases where users cancel OTP and immediately retry
+            verification_age = datetime.now(pytz.UTC) - existing.email_verification_expires_at + timedelta(hours=24)
+            if datetime.now(pytz.UTC) > existing.email_verification_expires_at or verification_age > timedelta(hours=23):
+                # Expired or old verification - clean it up and allow new registration
                 existing.email_verification_token_hash = None
                 existing.email_verification_expires_at = None
                 existing.email_verified_at = None
                 db.delete(existing)
                 db.commit()
-                logger.info("Cleaned up expired pending verification", email=email)
+                logger.info("Cleaned up expired/old pending verification", email=email, age_hours=verification_age.total_seconds()/3600)
             else:
                 # Still has valid pending verification - user should complete it or use resend
                 raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
@@ -417,15 +419,17 @@ def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get
     
     # Check if this is a pending verification that was never completed
     if existing.email_verification_token_hash and existing.email_verification_expires_at:
-        # If the pending verification has expired, clean it up and treat as new account
-        if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
-            # Expired verification - clean up and treat as new account
+        # If the pending verification has expired OR is older than 1 hour, clean it up and treat as new account
+        # This handles cases where users cancel OTP and immediately retry
+        verification_age = datetime.now(pytz.UTC) - existing.email_verification_expires_at + timedelta(hours=24)
+        if datetime.now(pytz.UTC) > existing.email_verification_expires_at or verification_age > timedelta(hours=23):
+            # Expired or old verification - clean it up and treat as new account
             existing.email_verification_token_hash = None
             existing.email_verification_expires_at = None
             existing.email_verified_at = None
             db.delete(existing)
             db.commit()
-            logger.info("Cleaned up expired pending verification during signin attempt", email=email)
+            logger.info("Cleaned up expired/old pending verification during signin attempt", email=email, age_hours=verification_age.total_seconds()/3600)
             # Now treat as new account - user should register first
             raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
     

@@ -22,6 +22,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   const [resendAttempts, setResendAttempts] = useState(0)
   const [maxAttempts] = useState(5)
   const [maxResendAttempts] = useState(3)
+  const [isNavigating, setIsNavigating] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -39,7 +40,11 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   // Create a local cancel handler to ensure it's always a function
   const handleCancel = () => {
     if (typeof onCancel === 'function') {
-      onCancel()
+      setIsNavigating(true)
+      // Add a small delay to prevent immediate backend conflicts
+      setTimeout(() => {
+        onCancel()
+      }, 100)
     } else {
       console.error('onCancel is not a function:', onCancel)
     }
@@ -48,7 +53,11 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   // Handle back navigation
   const handleBack = () => {
     if (typeof onBack === 'function') {
-      onBack()
+      setIsNavigating(true)
+      // Add a small delay to prevent immediate backend conflicts
+      setTimeout(() => {
+        onBack()
+      }, 100)
     }
   }
 
@@ -180,96 +189,145 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with close button */}
-      <div className="flex justify-end">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-6">
+        <div className="text-left">
+          <h1 className="text-2xl font-bold text-white mb-1">Enter Code</h1>
+          <p className="text-gray-400 text-sm">We sent a verification code to</p>
+          <p className="text-blue-400 font-medium">{emailMasked}</p>
+        </div>
         <button
           onClick={handleCancel}
-          className="text-gray-400 hover:text-white transition-colors p-2 rounded hover:bg-gray-700"
+          disabled={isNavigating}
+          className="text-gray-400 hover:text-white transition-colors p-3 rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Cancel"
           type="button"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          {isNavigating ? (
+            <svg className="animate-spin w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
         </button>
       </div>
 
-      {/* OTP Input Form */}
-      <form onSubmit={submit} className="space-y-6">
-        <div className="space-y-3">
-          <input
-            ref={inputRef}
-            id="otp-input"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
-            placeholder="Enter code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-xl px-6 py-4 text-black tracking-widest text-center text-xl font-mono border-2 border-gray-300 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
-            disabled={loading}
-          />
-        </div>
+              {/* Main Content */}
+        <div className="flex-1 flex flex-col justify-center px-6 pb-6">
+          {/* Error Message - Minimal */}
+          {error && (
+            <div className="mb-4 text-center">
+              <div className="inline-flex items-center px-3 py-2 rounded-full bg-red-900/30 border border-red-600/50 text-red-300 text-sm">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            </div>
+          )}
+          
+          {/* OTP Input Form */}
+          <form onSubmit={submit} className="space-y-8">
+          <div className="space-y-6">
+            <div className="text-center">
+              <label htmlFor="otp-input" className="text-lg font-medium text-gray-300 mb-4 block">
+                Enter the 6-digit code
+              </label>
+            </div>
+            
+            <div className="relative">
+              <input
+                ref={inputRef}
+                id="otp-input"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="000000"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-gray-800/50 backdrop-blur-sm border-2 border-gray-600 rounded-2xl px-8 py-6 text-white tracking-[0.5em] text-center text-2xl font-mono placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 hover:border-gray-500"
+                disabled={loading}
+              />
+              <div className="absolute inset-0 pointer-events-none rounded-2xl border-2 border-transparent bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 opacity-0 transition-opacity duration-300 focus-within:opacity-100"></div>
+            </div>
+          </div>
 
-        {/* Verify Button */}
-        <button 
-          disabled={loading || code.length !== 6 || attempts >= maxAttempts} 
-          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          {/* Verify Button */}
+          <button 
+            disabled={loading || code.length !== 6 || attempts >= maxAttempts} 
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold py-5 px-8 rounded-2xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/30 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Verifying...
+              </span>
+            ) : (
+              'Verify Code'
+            )}
+          </button>
+        </form>
+
+        {/* Action Buttons */}
+        <div className="space-y-6 mt-8">
+          {/* Resend Button */}
+          <div className="text-center">
+            <button 
+              onClick={resend} 
+              disabled={cooldown > 0 || resendLoading || resendAttempts >= maxResendAttempts} 
+              className="text-blue-400 hover:text-blue-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors font-medium text-base hover:underline"
+            >
+              {resendLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Sending...
+                </span>
+              ) : cooldown > 0 ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {formatTime(cooldown)}
+                </span>
+              ) : (
+                'Resend Code'
+              )}
+            </button>
+          </div>
+
+          {/* Back Button */}
+          <div className="text-center">
+                      <button
+            onClick={handleBack}
+            disabled={isNavigating}
+            className="text-gray-400 hover:text-gray-300 transition-colors font-medium text-base hover:underline flex items-center justify-center mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isNavigating ? (
+              <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Verifying...
-            </span>
-          ) : (
-            'Verify'
-          )}
-        </button>
-      </form>
-
-      {/* Resend Section */}
-      <div className="space-y-4">
-        <div className="text-center">
-          <button 
-            onClick={resend} 
-            disabled={cooldown > 0 || resendLoading || resendAttempts >= maxResendAttempts} 
-            className="text-sm text-blue-400 hover:text-blue-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-          >
-            {resendLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Sending...
-              </span>
-            ) : cooldown > 0 ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {formatTime(cooldown)}
-              </span>
             ) : (
-              'Resend'
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             )}
+            {isNavigating ? 'Going back...' : 'Back to Email'}
           </button>
-        </div>
-
-        {/* Back Button */}
-        <div className="text-center">
-          <button
-            onClick={handleBack}
-            className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
-          >
-            ← Back
-          </button>
+          </div>
         </div>
       </div>
     </div>
