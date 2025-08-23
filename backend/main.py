@@ -516,6 +516,62 @@ class VerifyAuthBody(BaseModel):
     pendingId: str
     code: str
 
+class ResendAuthBody(BaseModel):
+    pendingId: str
+    email: EmailStr
+    isSignIn: bool = False
+
+@router.post("/auth/resend")
+def resend_auth(body: ResendAuthBody, request: Request, db: Session = Depends(get_db)):
+    """Resend OTP code for existing pending verification"""
+    from sqlalchemy import select
+    from models import Household
+    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
+    from emails.sender import send_email
+
+    if not is_valid_uuid(body.pendingId):
+        raise HTTPException(status_code=400, detail="Invalid pendingId")
+
+    email = str(body.email).strip().lower()
+    
+    # Find household by pendingId and email
+    household = db.execute(
+        select(Household).where(
+            and_(
+                Household.id == uuid.UUID(body.pendingId),
+                Household.owner_email == email
+            )
+        )
+    ).scalar_one_or_none()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Pending verification not found")
+    
+    # Check if there's an existing pending verification
+    if not household.email_verification_token_hash or not household.email_verification_expires_at:
+        raise HTTPException(status_code=400, detail="No pending verification")
+    
+    # Check if code has expired
+    if datetime.now(pytz.UTC) > household.email_verification_expires_at:
+        raise HTTPException(status_code=410, detail="Code expired")
+    
+    # Rate limiting for resend requests
+    rl_key = f"{request.client.host}:resend:{email}"
+    if not rate_limit_ok(rl_key):
+        raise HTTPException(status_code=429, detail="Too many resend requests. Please wait before retrying.")
+    
+    # Generate new OTP and update household
+    code = generate_otp()
+    household.email_verification_token_hash = hash_token(code)
+    household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
+    db.add(household)
+    db.commit()
+    
+    # Send new email
+    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
+    send_email(to=email, subject="Your MAS verification code", html=html)
+    
+    return {"message": "Verification code resent successfully", "to": mask_email(email)}
 
 @router.post("/auth/verify")
 def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(get_db)):
@@ -530,11 +586,11 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
     if not household.email_verification_token_hash or not household.email_verification_expires_at:
         raise HTTPException(status_code=400, detail="No pending verification")
     if datetime.now(pytz.UTC) > household.email_verification_expires_at:
-        raise HTTPException(status_code=400, detail="Code expired")
+        raise HTTPException(status_code=410, detail="Code expired")
 
     from auth.otp import hash_token
     if hash_token(body.code.strip()) != household.email_verification_token_hash:
-        raise HTTPException(status_code=401, detail="Invalid code")
+        raise HTTPException(status_code=400, detail="Invalid code")
 
     household.email_verified_at = datetime.now(pytz.UTC)
     household.email_verification_token_hash = None
@@ -561,8 +617,7 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
         headers={"Cache-Control": "no-store"},
     )
 
-
-@router.get("/households/me")
+@app.get("/households/me")
 def households_me(request: Request, db: Session = Depends(get_db)):
     from sqlalchemy import select
     from models import Household, Member

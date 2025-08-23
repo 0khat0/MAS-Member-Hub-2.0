@@ -13,6 +13,14 @@ export default function HomeAuth() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loginMethod, setLoginMethod] = useState<'email' | 'account'>('email')
+  
+  // Form state persistence for OTP cancellation
+  const [formState, setFormState] = useState({
+    email: '',
+    name: '',
+    loginMethod: 'email' as 'email' | 'account',
+    accountNumber: ''
+  });
 
   useEffect(() => {
     // Try session-based auth: if already logged in, go to profile
@@ -27,11 +35,32 @@ export default function HomeAuth() {
     check()
   }, [])
 
+  // Save form state before starting OTP
+  const saveFormState = () => {
+    setFormState({
+      email,
+      name,
+      loginMethod,
+      accountNumber
+    });
+  };
+
+  // Restore form state after OTP cancellation
+  const restoreFormState = () => {
+    setEmail(formState.email);
+    setName(formState.name);
+    setLoginMethod(formState.loginMethod);
+    setAccountNumber(formState.accountNumber);
+  };
+
   const start = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
+      // Save form state before starting OTP
+      saveFormState();
+      
       if (loginMethod === 'account' && accountNumber.trim()) {
         // Login with account number
         const res = await apiFetch('/v1/auth/start-account', {
@@ -97,9 +126,11 @@ export default function HomeAuth() {
           rawEmail={email} 
           onBack={() => {
             setPendingId(null)
+            restoreFormState()
           }}
           onCancel={() => {
             setPendingId(null)
+            restoreFormState()
           }}
           onVerified={afterVerify} 
         />

@@ -12,6 +12,12 @@ export default function InlineAuthGate() {
   const [emailMasked, setEmailMasked] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Form state persistence for OTP cancellation
+  const [formState, setFormState] = useState({
+    email: '',
+    name: ''
+  });
 
   useEffect(() => {
     const check = async () => {
@@ -25,11 +31,28 @@ export default function InlineAuthGate() {
     check()
   }, [])
 
+  // Save form state before starting OTP
+  const saveFormState = () => {
+    setFormState({
+      email,
+      name
+    });
+  };
+
+  // Restore form state after OTP cancellation
+  const restoreFormState = () => {
+    setEmail(formState.email);
+    setName(formState.name);
+  };
+
   const start = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
+      // Save form state before starting OTP
+      saveFormState();
+      
       const res = await apiFetch('/v1/auth/start', { method: 'POST', body: JSON.stringify({ email }) })
       if (!res.ok) throw new Error('fail')
       const data = await res.json()
@@ -105,9 +128,11 @@ export default function InlineAuthGate() {
               rawEmail={email} 
               onBack={() => {
                 setPendingId(null)
+                restoreFormState()
               }}
               onCancel={() => {
                 setPendingId(null)
+                restoreFormState()
               }}
               onVerified={afterVerify} 
             />

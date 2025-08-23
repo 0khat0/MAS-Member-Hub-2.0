@@ -53,6 +53,14 @@ function MemberCheckin() {
   const [otpPendingId, setOtpPendingId] = useState<string | null>(null);
   const [otpEmailMasked, setOtpEmailMasked] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
+  
+  // Form state persistence for OTP cancellation
+  const [formState, setFormState] = useState({
+    email: '',
+    name: '',
+    familyNames: [] as string[],
+    isFamily: false
+  });
 
   // Unified error handling function
   const handleError = (errorMessage: string) => {
@@ -78,6 +86,24 @@ function MemberCheckin() {
   };
   const addFamilyMember = () => setFamilyNames(names => [...names, ""]);
   const removeFamilyMember = (idx: number) => setFamilyNames(names => names.filter((_, i) => i !== idx));
+
+  // Save form state before starting OTP
+  const saveFormState = () => {
+    setFormState({
+      email: formEmail,
+      name: formName,
+      familyNames: [...familyNames],
+      isFamily
+    });
+  };
+
+  // Restore form state after OTP cancellation
+  const restoreFormState = () => {
+    setFormEmail(formState.email);
+    setFormName(formState.name);
+    setFamilyNames([...formState.familyNames]);
+    setIsFamily(formState.isFamily);
+  };
 
   // On load, check if user is already logged in
   useEffect(() => {
@@ -173,10 +199,12 @@ function MemberCheckin() {
                 rawEmail={otpEmail}
                 onBack={() => {
                   setOtpPendingId(null)
+                  restoreFormState()
                   setStatus('register')
                 }}
                 onCancel={() => {
                   setOtpPendingId(null)
+                  restoreFormState()
                   setStatus('register')
                 }}
                 onVerified={async (verifyPayload: any) => {
@@ -430,6 +458,9 @@ function MemberCheckin() {
                   if (!/^\s*\S+\s+\S+/.test(formName.trim())) { setStatus('error'); setMessage('Please enter member full name (first and last).'); return; }
                   if (!/^\S+@\S+\.\S+$/.test(formEmail.trim())) { setStatus('error'); setMessage('Please enter a valid member email.'); return; }
                   try {
+                    // Save form state before starting OTP
+                    saveFormState();
+                    
                     const res = await apiFetch('/v1/auth/start', { method: 'POST', body: JSON.stringify({ email: formEmail.trim() }) })
                     if (!res.ok) throw new Error('start failed')
                     const data = await res.json()
