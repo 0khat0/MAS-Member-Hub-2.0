@@ -360,8 +360,23 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
     # Check if account already exists - REGISTRATION IS NOT ALLOWED FOR EXISTING ACCOUNTS
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
     if existing:
-        # Account exists - REGISTRATION NOT ALLOWED, user must sign in
-        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+        # Check if this is a pending verification that was never completed
+        if existing.email_verification_token_hash and existing.email_verification_expires_at:
+            # If the pending verification has expired, clean it up and allow new registration
+            if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
+                # Expired verification - clean up and allow new registration
+                existing.email_verification_token_hash = None
+                existing.email_verification_expires_at = None
+                existing.email_verified_at = None
+                db.delete(existing)
+                db.commit()
+                logger.info("Cleaned up expired pending verification", email=email)
+            else:
+                # Still has valid pending verification - user should complete it or use resend
+                raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+        else:
+            # Account exists and is verified - REGISTRATION NOT ALLOWED, user must sign in
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
     
     # Only create new accounts - this is the registration endpoint
     new_household = Household(owner_email=email)
@@ -400,7 +415,21 @@ def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get
         # Account doesn't exist - user must register first
         raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
     
-    # Account exists - send OTP for sign in
+    # Check if this is a pending verification that was never completed
+    if existing.email_verification_token_hash and existing.email_verification_expires_at:
+        # If the pending verification has expired, clean it up and treat as new account
+        if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
+            # Expired verification - clean up and treat as new account
+            existing.email_verification_token_hash = None
+            existing.email_verification_expires_at = None
+            existing.email_verified_at = None
+            db.delete(existing)
+            db.commit()
+            logger.info("Cleaned up expired pending verification during signin attempt", email=email)
+            # Now treat as new account - user should register first
+            raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
+    
+    # Account exists and is verified - send OTP for sign in
     rl_key = f"{request.client.host}:{email}"
     if not rate_limit_ok(rl_key):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")

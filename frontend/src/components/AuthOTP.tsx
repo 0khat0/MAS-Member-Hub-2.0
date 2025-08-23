@@ -25,13 +25,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Show initial success message when component mounts
-  useEffect(() => {
-    setSuccess('Verification code sent! Check your email.')
-    // Auto-clear success message after 5 seconds
-    const timer = setTimeout(() => setSuccess(null), 5000)
-    return () => clearTimeout(timer)
-  }, [])
+
 
   // Auto-focus on OTP input when component mounts
   useEffect(() => {
@@ -158,7 +152,6 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
         return
       }
       
-      setSuccess('New code sent successfully!')
       setResendAttempts(prev => prev + 1)
       // Progressive cooldown: 30s, 60s, 120s
       const cooldownTime = Math.min(30 * Math.pow(2, resendAttempts), 120)
@@ -188,16 +181,12 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
 
   return (
     <div className="space-y-4">
-      {/* Header with email and close button */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="text-sm text-gray-300">We sent a code to</div>
-          <div className="text-sm font-medium text-white">{emailMasked}</div>
-        </div>
+      {/* Header with close button */}
+      <div className="flex justify-end">
         <button
           onClick={handleCancel}
-          className="text-gray-400 hover:text-white transition-colors p-2 rounded hover:bg-gray-700 ml-3"
-          title="Cancel authentication"
+          className="text-gray-400 hover:text-white transition-colors p-2 rounded hover:bg-gray-700"
+          title="Cancel"
           type="button"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,73 +195,50 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
         </button>
       </div>
 
-      {/* Success/Error Messages */}
-      {success && (
-        <div className="bg-green-900/50 border border-green-600 text-green-300 px-3 py-2 rounded text-sm">
-          {success}
-        </div>
-      )}
-      
-      {error && (
-        <div className="bg-red-900/50 border border-red-600 text-red-300 px-3 py-2 rounded text-sm">
-          {error}
-        </div>
-      )}
-
       {/* OTP Input Form */}
-      <form onSubmit={submit} className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="otp-input" className="text-sm font-medium text-gray-300">
-            6-digit verification code
-          </label>
+      <form onSubmit={submit} className="space-y-6">
+        <div className="space-y-3">
           <input
             ref={inputRef}
             id="otp-input"
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={6}
-            placeholder="Enter 6-digit code"
+            placeholder="Enter code"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             onKeyDown={handleKeyDown}
-            className="w-full rounded-lg px-4 py-3 text-black tracking-widest text-center text-lg font-mono border-2 border-gray-300 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
+            className="w-full rounded-xl px-6 py-4 text-black tracking-widest text-center text-xl font-mono border-2 border-gray-300 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
             disabled={loading}
           />
         </div>
 
-        {/* Attempt Counter */}
-        {attempts > 0 && (
-          <div className="text-xs text-gray-400 text-center">
-            {attempts} of {maxAttempts} attempts used
-          </div>
-        )}
-
         {/* Verify Button */}
         <button 
           disabled={loading || code.length !== 6 || attempts >= maxAttempts} 
-          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-4 px-6 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
         >
           {loading ? (
             <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               Verifying...
             </span>
           ) : (
-            'Verify Code'
+            'Verify'
           )}
         </button>
       </form>
 
       {/* Resend Section */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="text-center">
           <button 
             onClick={resend} 
             disabled={cooldown > 0 || resendLoading || resendAttempts >= maxResendAttempts} 
-            className="text-sm text-blue-400 hover:text-blue-300 disabled:text-gray-500 disabled:cursor-not-allowed underline transition-colors"
+            className="text-sm text-blue-400 hover:text-blue-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
           >
             {resendLoading ? (
               <span className="flex items-center justify-center">
@@ -291,25 +257,18 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
                 {formatTime(cooldown)}
               </span>
             ) : (
-              'Resend code'
+              'Resend'
             )}
           </button>
         </div>
-
-        {/* Resend Attempt Counter */}
-        {resendAttempts > 0 && (
-          <div className="text-xs text-gray-400 text-center">
-            {resendAttempts} of {maxResendAttempts} resend attempts used
-          </div>
-        )}
 
         {/* Back Button */}
         <div className="text-center">
           <button
             onClick={handleBack}
-            className="text-sm text-gray-400 hover:text-gray-300 underline transition-colors"
+            className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
           >
-            ← Back to email
+            ← Back
           </button>
         </div>
       </div>
