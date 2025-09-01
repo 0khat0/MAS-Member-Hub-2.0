@@ -195,7 +195,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
         <div className="text-left flex-1">
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-1">Enter Code</h1>
           <p className="text-gray-400 text-xs sm:text-sm mb-1">We sent a verification code to</p>
-          <p className="text-blue-400 font-medium text-sm sm:text-base break-all">{emailMasked}</p>
+          <p className="text-blue-400 font-medium text-sm sm:text-base break-all mb-4 sm:mb-6">{emailMasked}</p>
         </div>
         <button
           onClick={handleCancel}
@@ -222,7 +222,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
          <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 pb-4 sm:pb-6">
            {/* Error Message - Mobile Optimized */}
            {error && (
-             <div className="mb-4 sm:mb-6 text-center">
+             <div className="mb-3 sm:mb-4 text-center">
                <div className="inline-flex items-center px-3 py-2 rounded-full bg-red-900/30 border border-red-600/50 text-red-300 text-xs sm:text-sm max-w-full">
                  <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -233,10 +233,10 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
            )}
            
            {/* OTP Input Form - Mobile Optimized */}
-           <form onSubmit={submit} className="space-y-6 sm:space-y-8">
-           <div className="space-y-4 sm:space-y-6">
+           <form onSubmit={submit} className="space-y-4 sm:space-y-6">
+           <div className="space-y-3 sm:space-y-4">
              <div className="text-center">
-               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 mb-3 sm:mb-4 block">
+               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 mb-2 sm:mb-3 block">
                  Enter the 6-digit code
                </label>
              </div>
