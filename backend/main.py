@@ -152,11 +152,15 @@ async def startup_event():
         # Ensure performance indexes (idempotent)
         with engine.connect() as conn:
             conn.execute(text("""
+            -- Drop the unique constraint on owner_email if it exists (to allow retry with same email)
+            DROP INDEX IF EXISTS idx_households_email_unique;
+            
             CREATE INDEX IF NOT EXISTS idx_member_name_lower_trim ON members (lower(trim(name)));
             CREATE INDEX IF NOT EXISTS idx_member_email_lower ON members (lower(email));
             CREATE INDEX IF NOT EXISTS idx_checkin_member_ts ON checkins (member_id, timestamp);
             CREATE INDEX IF NOT EXISTS idx_member_barcode ON members (barcode);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_households_email_unique ON households (lower(owner_email));
+            -- Removed unique constraint on owner_email to allow retry with same email
+            -- CREATE UNIQUE INDEX IF NOT EXISTS idx_households_email_unique ON households (lower(owner_email));
     
             CREATE UNIQUE INDEX IF NOT EXISTS idx_households_household_code ON households (household_code);
             """))

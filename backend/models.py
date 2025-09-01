@@ -71,7 +71,22 @@ def set_household_code(mapper, connection, target: "Household"):
     if target.owner_email:
         target.owner_email = target.owner_email.strip().lower()
     if not target.household_code:
-        target.household_code = gen_code_household(5)  # 5-character account number
+        # Generate a unique household code
+        from sqlalchemy import text
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            code = gen_code_household(5)
+            # Check if this code already exists
+            result = connection.execute(
+                text("SELECT COUNT(*) FROM households WHERE household_code = :code"),
+                {"code": code}
+            ).scalar()
+            if result == 0:
+                target.household_code = code
+                break
+        else:
+            # If we couldn't generate a unique code after max_attempts, raise an error
+            raise ValueError("Could not generate unique household code after 10 attempts")
 
 class Checkin(Base):
     __tablename__ = "checkins"
