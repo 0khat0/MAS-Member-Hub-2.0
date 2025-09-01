@@ -39,7 +39,7 @@ class Member(Base):
     active = Column(Boolean, default=True, index=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)  # Soft delete support
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(pytz.UTC), index=True)
-    household_id = Column(UUID(as_uuid=True), ForeignKey("households.id", ondelete="SET NULL"), nullable=True, index=True)
+    household_id = Column(UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), nullable=True, index=True)
     checkins = relationship("Checkin", back_populates="member")
     household = relationship("Household", back_populates="members")
     
