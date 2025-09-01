@@ -650,7 +650,7 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
         headers={"Cache-Control": "no-store"},
     )
 
-@app.get("/households/me")
+@router.get("/households/me")
 def households_me(request: Request, db: Session = Depends(get_db)):
     from sqlalchemy import select
     from models import Household, Member
