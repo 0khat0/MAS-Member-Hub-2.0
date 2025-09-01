@@ -10,10 +10,10 @@ MVP for a Muay Thai gym member check-in system via QR
 ## Features
 
 - Member check-in system
-- NFC/QR code support
+- QR code support
 - Admin dashboard
 - Member statistics
-- Barcode generation
+- Unique 12-digit ID generation
 
 ## Tech Stack
 
