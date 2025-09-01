@@ -1721,6 +1721,11 @@ async def delete_family(request: Request, email: str, db: Session = Depends(get_
     if not household:
         raise HTTPException(status_code=404, detail="Family not found")
     
+    logger.info(f"Starting deletion of family account", 
+               household_id=str(household.id), 
+               household_code=household.household_code,
+               email=email)
+    
     # Get all family members
     family_members = db.query(models.Member).filter(
         models.Member.household_id == household.id
@@ -1729,8 +1734,11 @@ async def delete_family(request: Request, email: str, db: Session = Depends(get_
     if not family_members:
         raise HTTPException(status_code=404, detail="No family members found")
     
+    logger.info(f"Found {len(family_members)} family members to delete")
+    
     try:
         # Delete all check-ins for all family members
+        checkin_count = 0
         for member in family_members:
             checkins = db.query(models.Checkin).filter(
                 models.Checkin.member_id == member.id
@@ -1738,32 +1746,85 @@ async def delete_family(request: Request, email: str, db: Session = Depends(get_
             
             for checkin in checkins:
                 db.delete(checkin)
+                checkin_count += 1
+        
+        logger.info(f"Deleted {checkin_count} check-ins")
         
         # Delete all family members
         for member in family_members:
             db.delete(member)
         
+        logger.info(f"Deleted {len(family_members)} family members")
+        
+        # Store household info before deletion for logging
+        household_id = str(household.id)
+        household_code = household.household_code
+        
         # Delete the household (this will also delete the account number)
         db.delete(household)
         
+        # Commit the transaction
         db.commit()
         
-        logger.info("Family account deleted", 
-                   household_id=str(household.id), 
-                   household_code=household.household_code,
+        # Verify deletion
+        household_still_exists = db.query(models.Household).filter(
+            models.Household.owner_email == email
+        ).first()
+        
+        if household_still_exists:
+            logger.error(f"Household still exists after deletion attempt", email=email)
+            raise HTTPException(status_code=500, detail="Failed to delete household - it still exists")
+        
+        logger.info("Family account successfully deleted", 
+                   household_id=household_id, 
+                   household_code=household_code,
                    member_count=len(family_members),
                    email=email)
         
         return {
-            "message": f"Family account deleted successfully. Removed {len(family_members)} members and account number {household.household_code}.",
+            "message": f"Family account deleted successfully. Removed {len(family_members)} members and account number {household_code}.",
             "deleted_members": len(family_members),
-            "deleted_household_code": household.household_code
+            "deleted_household_code": household_code,
+            "deleted_checkins": checkin_count
         }
         
     except Exception as e:
         db.rollback()
         logger.error("Failed to delete family account", error=str(e), email=email)
         raise HTTPException(status_code=500, detail="Failed to delete family account")
+
+@app.post("/admin/cleanup-orphaned")
+@limiter.limit("5/minute")
+async def cleanup_orphaned_households(request: Request, db: Session = Depends(get_db)):
+    """Clean up orphaned households (households with no members)"""
+    try:
+        # Find households with no members
+        orphaned_households = db.query(models.Household).outerjoin(
+            models.Member, models.Household.id == models.Member.household_id
+        ).filter(models.Member.id.is_(None)).all()
+        
+        deleted_count = 0
+        for household in orphaned_households:
+            logger.info(f"Deleting orphaned household", 
+                       household_id=str(household.id), 
+                       household_code=household.household_code,
+                       email=household.owner_email)
+            db.delete(household)
+            deleted_count += 1
+        
+        db.commit()
+        
+        logger.info(f"Cleaned up {deleted_count} orphaned households")
+        
+        return {
+            "message": f"Cleaned up {deleted_count} orphaned households",
+            "deleted_count": deleted_count
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error("Failed to cleanup orphaned households", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to cleanup orphaned households")
 
 @app.post("/member/{member_id}/restore")
 @limiter.limit("5/minute")
