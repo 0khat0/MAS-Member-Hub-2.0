@@ -87,38 +87,95 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Welcome to MAS Member Hub</title>
         <style>
+            /* Reset and base styles for better email client compatibility */
+            * {{
+                box-sizing: border-box;
+            }}
+            
             body {{
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                 line-height: 1.6;
                 color: #333;
                 max-width: 600px;
                 margin: 0 auto;
-                padding: 20px;
+                padding: 10px;
                 background-color: #f8f9fa;
+                -webkit-text-size-adjust: 100%;
+                -ms-text-size-adjust: 100%;
             }}
+            
+            /* Mobile-first responsive design */
+            @media only screen and (max-width: 600px) {{
+                body {{
+                    padding: 5px;
+                }}
+                .container {{
+                    padding: 20px 15px;
+                    margin: 0;
+                    border-radius: 8px;
+                }}
+                .header h1 {{
+                    font-size: 24px;
+                    line-height: 1.3;
+                }}
+                .header p {{
+                    font-size: 14px;
+                }}
+                .account-section {{
+                    padding: 20px 15px;
+                    margin: 20px 0;
+                }}
+                .account-number {{
+                    font-size: 28px;
+                    letter-spacing: 1px;
+                }}
+                .qr-section {{
+                    margin: 20px 0;
+                    padding: 15px;
+                }}
+                .instructions {{
+                    padding: 15px;
+                    margin: 20px 0;
+                }}
+                .highlight {{
+                    padding: 12px;
+                    margin: 20px 0;
+                }}
+                .footer {{
+                    margin-top: 25px;
+                    padding-top: 15px;
+                }}
+            }}
+            
             .container {{
                 background: white;
                 border-radius: 12px;
                 padding: 30px;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin: 10px;
             }}
+            
             .header {{
                 text-align: center;
                 margin-bottom: 30px;
                 padding-bottom: 20px;
                 border-bottom: 2px solid #e9ecef;
             }}
+            
             .header h1 {{
                 color: #dc3545;
                 margin: 0;
                 font-size: 28px;
                 font-weight: 700;
+                line-height: 1.2;
             }}
+            
             .header p {{
                 color: #6c757d;
                 margin: 10px 0 0 0;
                 font-size: 16px;
             }}
+            
             .account-section {{
                 background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
                 color: white;
@@ -127,13 +184,28 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 text-align: center;
                 margin: 25px 0;
             }}
+            
+            .account-section h2 {{
+                margin: 0 0 15px 0;
+                font-size: 20px;
+                font-weight: 600;
+            }}
+            
+            .account-section p {{
+                margin: 10px 0 0 0;
+                opacity: 0.9;
+                font-size: 14px;
+            }}
+            
             .account-number {{
                 font-size: 36px;
                 font-weight: bold;
                 letter-spacing: 2px;
                 margin: 10px 0;
-                font-family: 'Courier New', monospace;
+                font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+                word-break: break-all;
             }}
+            
             .qr-section {{
                 text-align: center;
                 margin: 30px 0;
@@ -141,9 +213,27 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 background: #f8f9fa;
                 border-radius: 10px;
             }}
+            
             .qr-code {{
                 margin: 20px 0;
+                display: inline-block;
             }}
+            
+            .qr-code img {{
+                max-width: 100%;
+                height: auto;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                display: block;
+                margin: 0 auto;
+            }}
+            
+            .qr-section p {{
+                font-size: 14px;
+                color: #6c757d;
+                margin: 15px 0 0 0;
+            }}
+            
             .instructions {{
                 background: #e7f3ff;
                 border-left: 4px solid #007bff;
@@ -151,17 +241,23 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 margin: 25px 0;
                 border-radius: 0 8px 8px 0;
             }}
+            
             .instructions h3 {{
                 margin: 0 0 15px 0;
                 color: #0056b3;
+                font-size: 18px;
             }}
+            
             .instructions ul {{
                 margin: 0;
                 padding-left: 20px;
             }}
+            
             .instructions li {{
                 margin: 8px 0;
+                line-height: 1.5;
             }}
+            
             .footer {{
                 text-align: center;
                 margin-top: 30px;
@@ -170,12 +266,43 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 color: #6c757d;
                 font-size: 14px;
             }}
+            
             .highlight {{
                 background: #fff3cd;
                 border: 1px solid #ffeaa7;
                 padding: 15px;
                 border-radius: 8px;
                 margin: 20px 0;
+                text-align: center;
+            }}
+            
+            .highlight a {{
+                color: #dc3545;
+                text-decoration: none;
+                font-weight: 600;
+            }}
+            
+            .highlight a:hover {{
+                text-decoration: underline;
+            }}
+            
+            /* Dark mode support for modern email clients */
+            @media (prefers-color-scheme: dark) {{
+                .container {{
+                    background: #1a1a1a;
+                    color: #ffffff;
+                }}
+                .qr-section {{
+                    background: #2a2a2a;
+                }}
+                .instructions {{
+                    background: #1e3a5f;
+                    color: #ffffff;
+                }}
+                .highlight {{
+                    background: #3d2c02;
+                    color: #ffffff;
+                }}
             }}
         </style>
     </head>
@@ -194,7 +321,6 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
             
             <div class="qr-section">
                 <h3>Your Member QR Code</h3>
-                <p>Use this QR code for quick check-ins at the gym</p>
                 <div class="qr-code">
                     <img src="data:image/png;base64,{qr_code_base64}" 
                          alt="Member QR Code" 
@@ -202,9 +328,6 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 </div>
                 <p style="font-size: 14px; color: #6c757d;">
                     <strong>Tip:</strong> Long-press the QR code to save it to your photos
-                </p>
-                <p style="font-size: 12px; color: #6c757d; margin-top: 8px;">
-                    <em>This QR code contains your email address and will work for family check-ins. Individual family members will get unique barcodes when added.</em>
                 </p>
             </div>
             
@@ -215,7 +338,6 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                     <li><strong>Check In:</strong> Show your QR code at the gym for quick check-ins</li>
                     <li><strong>Add Family:</strong> Invite family members to join your household</li>
                     <li><strong>Track Progress:</strong> Monitor your check-in streaks and attendance</li>
-                    <li><strong>Individual Barcodes:</strong> Each family member gets a unique barcode for individual check-ins</li>
                 </ul>
             </div>
             
