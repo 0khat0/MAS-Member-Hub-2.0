@@ -631,6 +631,18 @@ def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(
     db.add(household)
     db.commit()
 
+    # Send welcome email with account number and QR code
+    try:
+        from emails.sender import send_welcome_email
+        send_welcome_email(
+            to=household.owner_email,
+            account_number=household.household_code,
+            household_id=str(household.id)
+        )
+    except Exception as e:
+        # Log error but don't fail the verification
+        logger.error(f"Failed to send welcome email: {e}")
+
     token = _create_session_cookie(response, str(household.id))
     # prevent caching; include a short-lived session_token echo for immediate use
     response.headers["Cache-Control"] = "no-store"
