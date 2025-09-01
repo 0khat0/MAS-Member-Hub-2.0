@@ -389,58 +389,36 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
 
     email = str(body.email).strip().lower()
 
-    # Check if account already exists
+    # Look up existing household for this email
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-    if existing:
-        logger.info(f"Found existing household for {email}", 
-                   household_id=str(existing.id),
-                   has_verification_token=bool(existing.email_verification_token_hash),
-                   has_expires_at=bool(existing.email_verification_expires_at),
-                   is_verified=bool(existing.email_verified_at))
-        
-        # Check if this is a pending verification that was never completed
-        if existing.email_verification_token_hash and existing.email_verification_expires_at:
-            # If the pending verification has expired, clean it up and allow new registration
-            if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
-                # Expired verification - clean it up and allow new registration
-                db.delete(existing)
-                db.commit()
-                logger.info("Cleaned up expired pending verification", email=email)
-            else:
-                # Still has valid pending verification - user should complete it or use resend
-                logger.info(f"Rejecting registration - valid pending verification exists", email=email)
-                raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
-        elif existing.email_verified_at:
-            # Account exists and is verified - REGISTRATION NOT ALLOWED, user must sign in
-            logger.info(f"Rejecting registration - verified account exists", email=email)
-            raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
-        else:
-            # Account exists but not verified - clean it up and allow new registration
-            db.delete(existing)
-            db.commit()
-            logger.info("Cleaned up unverified account", email=email)
-    else:
-        logger.info(f"No existing household found for {email} - proceeding with new registration")
-    
-    # Create new account
-    new_household = Household(owner_email=email)
-    db.add(new_household)
-    db.flush()
+    if existing and existing.email_verified_at:
+        # Verified account must sign in
+        logger.info("Rejecting registration - verified account exists", email=email)
+        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
 
+    # Rate limit by IP + email
     rl_key = f"{request.client.host}:{email}"
     if not rate_limit_ok(rl_key):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
 
+    # Reuse or create a household for unverified flows
+    household = existing or Household(owner_email=email)
+    if not existing:
+        db.add(household)
+        db.flush()
+
+    # Always issue a fresh code for unverified accounts (cancel/resume safe)
     code = generate_otp()
-    new_household.email_verification_token_hash = hash_token(code)
-    new_household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
-    db.add(new_household)
+    household.email_verification_token_hash = hash_token(code)
+    household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
+    db.add(household)
     db.commit()
 
     html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
     send_email(to=email, subject="Your MAS verification code", html=html)
 
-    return {"pendingId": str(new_household.id), "to": mask_email(email)}
+    logger.info("OTP issued", email=email, household_id=str(household.id))
+    return {"pendingId": str(household.id), "to": mask_email(email)}
 
 
 @router.post("/auth/signin")
