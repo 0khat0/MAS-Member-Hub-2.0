@@ -357,30 +357,40 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
 
     email = str(body.email).strip().lower()
 
-    # Check if account already exists - REGISTRATION IS NOT ALLOWED FOR EXISTING ACCOUNTS
+    # Check if account already exists
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
     if existing:
+        logger.info(f"Found existing household for {email}", 
+                   household_id=str(existing.id),
+                   has_verification_token=bool(existing.email_verification_token_hash),
+                   has_expires_at=bool(existing.email_verification_expires_at),
+                   is_verified=bool(existing.email_verified_at))
+        
         # Check if this is a pending verification that was never completed
         if existing.email_verification_token_hash and existing.email_verification_expires_at:
-            # If the pending verification has expired OR is older than 1 hour, clean it up and allow new registration
-            # This handles cases where users cancel OTP and immediately retry
-            verification_age = datetime.now(pytz.UTC) - existing.email_verification_expires_at + timedelta(hours=24)
-            if datetime.now(pytz.UTC) > existing.email_verification_expires_at or verification_age > timedelta(hours=23):
-                # Expired or old verification - clean it up and allow new registration
-                existing.email_verification_token_hash = None
-                existing.email_verification_expires_at = None
-                existing.email_verified_at = None
+            # If the pending verification has expired, clean it up and allow new registration
+            if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
+                # Expired verification - clean it up and allow new registration
                 db.delete(existing)
                 db.commit()
-                logger.info("Cleaned up expired/old pending verification", email=email, age_hours=verification_age.total_seconds()/3600)
+                logger.info("Cleaned up expired pending verification", email=email)
             else:
                 # Still has valid pending verification - user should complete it or use resend
+                logger.info(f"Rejecting registration - valid pending verification exists", email=email)
                 raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
-        else:
+        elif existing.email_verified_at:
             # Account exists and is verified - REGISTRATION NOT ALLOWED, user must sign in
+            logger.info(f"Rejecting registration - verified account exists", email=email)
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+        else:
+            # Account exists but not verified - clean it up and allow new registration
+            db.delete(existing)
+            db.commit()
+            logger.info("Cleaned up unverified account", email=email)
+    else:
+        logger.info(f"No existing household found for {email} - proceeding with new registration")
     
-    # Only create new accounts - this is the registration endpoint
+    # Create new account
     new_household = Household(owner_email=email)
     db.add(new_household)
     db.flush()
@@ -419,19 +429,19 @@ def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get
     
     # Check if this is a pending verification that was never completed
     if existing.email_verification_token_hash and existing.email_verification_expires_at:
-        # If the pending verification has expired OR is older than 1 hour, clean it up and treat as new account
-        # This handles cases where users cancel OTP and immediately retry
-        verification_age = datetime.now(pytz.UTC) - existing.email_verification_expires_at + timedelta(hours=24)
-        if datetime.now(pytz.UTC) > existing.email_verification_expires_at or verification_age > timedelta(hours=23):
-            # Expired or old verification - clean it up and treat as new account
-            existing.email_verification_token_hash = None
-            existing.email_verification_expires_at = None
-            existing.email_verified_at = None
+        # If the pending verification has expired, clean it up and treat as new account
+        if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
+            # Expired verification - clean it up and treat as new account
             db.delete(existing)
             db.commit()
-            logger.info("Cleaned up expired/old pending verification during signin attempt", email=email, age_hours=verification_age.total_seconds()/3600)
+            logger.info("Cleaned up expired pending verification during signin attempt", email=email)
             # Now treat as new account - user should register first
             raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
+    
+    # Check if account is actually verified
+    if not existing.email_verified_at:
+        # Account exists but not verified - user should complete registration first
+        raise HTTPException(status_code=400, detail="Account not verified. Please complete registration first.")
     
     # Account exists and is verified - send OTP for sign in
     rl_key = f"{request.client.host}:{email}"
@@ -2136,3 +2146,49 @@ def auth_session(request: Request, db: Session = Depends(get_db)):
     if not household:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return {"ok": True, "householdId": str(household.id), "email": household.owner_email} 
+
+@router.post("/auth/cleanup-expired")
+def cleanup_expired_verifications(request: Request, db: Session = Depends(get_db)):
+    """Clean up expired email verifications to allow users to retry registration"""
+    from sqlalchemy import select, delete
+    from models import Household
+    
+    # Find all expired verifications
+    expired_households = db.execute(
+        select(Household).where(
+            Household.email_verification_expires_at < datetime.now(pytz.UTC),
+            Household.email_verification_token_hash.is_not(None)
+        )
+    ).scalars().all()
+    
+    cleaned_count = 0
+    for household in expired_households:
+        if not household.email_verified_at:
+            # Only delete unverified accounts with expired OTPs
+            db.delete(household)
+            cleaned_count += 1
+    
+    db.commit()
+    
+    logger.info(f"Cleaned up {cleaned_count} expired verifications")
+    return {"message": f"Cleaned up {cleaned_count} expired verifications", "cleaned_count": cleaned_count}
+
+
+@router.post("/auth/reset-email")
+def reset_email_registration(request: Request, body: StartAuthBody, db: Session = Depends(get_db)):
+    """Reset email registration - allows users to start fresh with the same email"""
+    from sqlalchemy import select
+    from models import Household
+    
+    email = str(body.email).strip().lower()
+    
+    # Find any existing household with this email
+    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
+    
+    if existing:
+        # Delete the existing household to allow fresh registration
+        db.delete(existing)
+        db.commit()
+        logger.info(f"Reset email registration for {email}")
+    
+    return {"message": "Email reset successfully. You can now register again."}
