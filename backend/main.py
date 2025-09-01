@@ -1729,11 +1729,13 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
         
         logger.info(f"Deleted {checkin_count} check-ins for member")
         
-        # Now delete the member
+        # Now delete the member and flush so subsequent counts don't see it
         db.delete(member)
+        db.flush()
         
         # Check if this was the last member in the household
         if household_id and household:
+            # Count remaining members for this household (member has been flushed/deleted)
             remaining_members = db.query(models.Member).filter(
                 models.Member.household_id == household_id
             ).count()
