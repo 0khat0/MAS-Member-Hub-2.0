@@ -149,6 +149,24 @@ async def startup_event():
     try:
         # Create all tables
         models.Base.metadata.create_all(bind=engine)
+        
+        # CLEAN UP DEAD DATA FIRST - Remove all unverified/expired households
+        with engine.connect() as conn:
+            # Remove all unverified households (clean slate)
+            result1 = conn.execute(text("DELETE FROM households WHERE email_verified_at IS NULL"))
+            
+            # Remove expired verifications (older than 24 hours)
+            result2 = conn.execute(text("""
+                DELETE FROM households 
+                WHERE email_verification_expires_at < NOW() - INTERVAL '24 hours' 
+                AND email_verified_at IS NULL
+            """))
+            
+            # Log cleanup results
+            logger.info(f"Startup cleanup: Removed {result1.rowcount} unverified households, {result2.rowcount} expired verifications")
+            
+            conn.commit()
+        
         # Ensure performance indexes (idempotent)
         with engine.connect() as conn:
             conn.execute(text("""

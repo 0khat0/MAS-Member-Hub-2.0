@@ -1,6 +1,5 @@
 -- Create extension if available (optional)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 -- Add households table
 CREATE TABLE IF NOT EXISTS households (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
