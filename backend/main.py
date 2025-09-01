@@ -162,8 +162,18 @@ async def startup_event():
                 AND email_verified_at IS NULL
             """))
             
+            # Remove orphaned households (households with no members)
+            result3 = conn.execute(text("""
+                DELETE FROM households 
+                WHERE id NOT IN (
+                    SELECT DISTINCT household_id 
+                    FROM members 
+                    WHERE household_id IS NOT NULL
+                )
+            """))
+            
             # Log cleanup results
-            logger.info(f"Startup cleanup: Removed {result1.rowcount} unverified households, {result2.rowcount} expired verifications")
+            logger.info(f"Startup cleanup: Removed {result1.rowcount} unverified households, {result2.rowcount} expired verifications, {result3.rowcount} orphaned households")
             
             conn.commit()
         
@@ -1677,7 +1687,7 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
 @app.delete("/member/{member_id}")
 @limiter.limit("5/minute")
 async def delete_member(request: Request, member_id: str, db: Session = Depends(get_db)):
-    """Hard delete a member"""
+    """Hard delete a member and clean up household if it's the last member"""
     # Validate UUID format
     if not is_valid_uuid(member_id):
         raise HTTPException(status_code=400, detail="Invalid member ID format")
@@ -1693,21 +1703,74 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
-    # Delete all associated check-ins first
-    checkins = db.query(models.Checkin).filter(
-        models.Checkin.member_id == member_uuid
-    ).all()
+    # Get household info before deletion for cleanup
+    household_id = member.household_id
+    household = None
+    if household_id:
+        household = db.query(models.Household).filter(
+            models.Household.id == household_id
+        ).first()
     
-    for checkin in checkins:
-        db.delete(checkin)
+    logger.info("Starting member deletion", 
+               member_id=str(member.id), 
+               name=member.name, 
+               email=member.email,
+               household_id=str(household_id) if household_id else None)
     
-    # Now delete the member
-    db.delete(member)
-    db.commit()
-    
-    logger.info("Member hard deleted", member_id=str(member.id), name=member.name, email=member.email)
-    
-    return {"message": "Member deleted successfully"}
+    try:
+        # Delete all associated check-ins first
+        checkins = db.query(models.Checkin).filter(
+            models.Checkin.member_id == member_uuid
+        ).all()
+        
+        checkin_count = len(checkins)
+        for checkin in checkins:
+            db.delete(checkin)
+        
+        logger.info(f"Deleted {checkin_count} check-ins for member")
+        
+        # Now delete the member
+        db.delete(member)
+        
+        # Check if this was the last member in the household
+        if household_id and household:
+            remaining_members = db.query(models.Member).filter(
+                models.Member.household_id == household_id
+            ).count()
+            
+            if remaining_members == 0:
+                logger.info("No members remaining in household, deleting household", 
+                           household_id=str(household_id),
+                           household_code=household.household_code if household else None)
+                
+                # Delete the household (this will also delete the account number)
+                db.delete(household)
+                
+                logger.info("Household deleted successfully", 
+                           household_id=str(household_id),
+                           household_code=household.household_code if household else None)
+            else:
+                logger.info(f"Household still has {remaining_members} members, keeping household")
+        
+        # Commit the transaction
+        db.commit()
+        
+        logger.info("Member deletion completed successfully", 
+                   member_id=str(member_uuid), 
+                   name=member.name if member else "Unknown", 
+                   email=member.email if member else "Unknown",
+                   household_deleted=household_id and remaining_members == 0 if 'remaining_members' in locals() else False)
+        
+        return {
+            "message": "Member deleted successfully",
+            "checkins_deleted": checkin_count,
+            "household_deleted": household_id and remaining_members == 0 if 'remaining_members' in locals() else False
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error("Failed to delete member", error=str(e), member_id=str(member_uuid))
+        raise HTTPException(status_code=500, detail="Failed to delete member")
 
 @app.delete("/family/{email}")
 @limiter.limit("5/minute")
@@ -1825,6 +1888,113 @@ async def cleanup_orphaned_households(request: Request, db: Session = Depends(ge
         db.rollback()
         logger.error("Failed to cleanup orphaned households", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to cleanup orphaned households")
+
+@app.post("/admin/cleanup-expired-verifications")
+@limiter.limit("5/minute")
+async def cleanup_expired_verifications(request: Request, db: Session = Depends(get_db)):
+    """Clean up expired verification attempts and unverified households"""
+    
+    # Delete households that are older than 24 hours and unverified
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    
+    expired_households = db.query(models.Household).filter(
+        models.Household.created_at < cutoff_time,
+        models.Household.verified == False
+    ).all()
+    
+    if not expired_households:
+        return {"message": "No expired verifications found", "deleted_count": 0}
+    
+    deleted_count = 0
+    deleted_households = []
+    
+    for household in expired_households:
+        try:
+            logger.info("Deleting expired verification household", 
+                       household_id=str(household.id),
+                       household_code=household.household_code,
+                       email=household.owner_email,
+                       created_at=str(household.created_at))
+            
+            db.delete(household)
+            deleted_count += 1
+            deleted_households.append({
+                "id": str(household.id),
+                "code": household.household_code,
+                "email": household.owner_email,
+                "created_at": str(household.created_at)
+            })
+            
+        except Exception as e:
+            logger.error("Failed to delete expired household", 
+                        error=str(e),
+                        household_id=str(household.id))
+    
+    try:
+        db.commit()
+        logger.info("Expired verification cleanup completed", deleted_count=deleted_count)
+        
+        return {
+            "message": f"Successfully deleted {deleted_count} expired verification households",
+            "deleted_count": deleted_count,
+            "deleted_households": deleted_households
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error("Failed to commit expired verification cleanup", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to cleanup expired verifications")
+
+@app.get("/admin/status")
+@limiter.limit("10/minute")
+async def get_admin_status(request: Request, db: Session = Depends(get_db)):
+    """Get current database status for admin monitoring"""
+    
+    try:
+        # Count total households
+        total_households = db.query(models.Household).count()
+        
+        # Count verified households
+        verified_households = db.query(models.Household).filter(
+            models.Household.verified == True
+        ).count()
+        
+        # Count unverified households
+        unverified_households = db.query(models.Household).filter(
+            models.Household.verified == False
+        ).count()
+        
+        # Count orphaned households (households with no members)
+        orphaned_households = db.query(models.Household).outerjoin(
+            models.Member, models.Household.id == models.Member.household_id
+        ).filter(models.Member.id.is_(None)).count()
+        
+        # Count total members
+        total_members = db.query(models.Member).count()
+        
+        # Count total check-ins
+        total_checkins = db.query(models.Checkin).count()
+        
+        return {
+            "status": "ok",
+            "timestamp": datetime.utcnow().isoformat(),
+            "households": {
+                "total": total_households,
+                "verified": verified_households,
+                "unverified": unverified_households,
+                "orphaned": orphaned_households
+            },
+            "members": {
+                "total": total_members
+            },
+            "checkins": {
+                "total": total_checkins
+            }
+        }
+        
+    except Exception as e:
+        logger.error("Failed to get admin status", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get admin status")
 
 @app.post("/member/{member_id}/restore")
 @limiter.limit("5/minute")
