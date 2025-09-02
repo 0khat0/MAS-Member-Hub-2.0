@@ -188,18 +188,21 @@ export default function HomeAuth() {
             />
           </>
         ) : (
-          <input
-            type="text"
-            placeholder="Enter your 5-character account number"
-            value={accountNumber}
-            onChange={(e) => {
-              const value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 5);
-              setAccountNumber(value);
-            }}
-            maxLength={5}
-            className="w-full rounded-lg px-4 py-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-500 text-center tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
-            required
-          />
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="ABC12"
+              value={accountNumber}
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 5);
+                setAccountNumber(value);
+              }}
+              maxLength={5}
+              className="w-full rounded-lg px-4 py-3 sm:py-4 bg-white border border-gray-300 text-gray-900 placeholder-gray-500 text-center tracking-wider font-mono text-lg sm:text-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 placeholder:text-sm sm:placeholder:text-base"
+              required
+            />
+            <p className="text-xs sm:text-sm text-gray-500 text-center">Enter your 5-character account number</p>
+          </div>
         )}
         
         {error && <div className="text-red-400 text-sm">{error}</div>}
