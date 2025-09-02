@@ -218,7 +218,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
       {showIOSHelp && (
         <div style={cardStyle} role="dialog" aria-live="polite" aria-label="Add to Home Screen instructions">
           <div style={{ fontSize: 14, lineHeight: 1.4, marginBottom: 8 }}>
-            <strong>iPhone / iPad</strong>
+            <strong>iPhone</strong>
             <ol style={{ margin: "6px 0 0 16px", padding: 0 }}>
               <li style={{ marginBottom: 4 }}>
                 Tap the <span aria-label="Share">🔗</span> <em>Share</em> button in Safari.
