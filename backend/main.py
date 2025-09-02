@@ -396,9 +396,15 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
         logger.info("Rejecting registration - verified account exists", email=email)
         raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
 
-    # Rate limit by IP + email
+    # Rate limit by IP + email. If we're rate limited but a valid pending OTP exists,
+    # return the existing pendingId to allow the client to proceed without sending another email.
     rl_key = f"{request.client.host}:{email}"
     if not rate_limit_ok(rl_key):
+        if existing and existing.email_verification_token_hash and existing.email_verification_expires_at:
+            if datetime.now(pytz.UTC) <= existing.email_verification_expires_at:
+                logger.info("Returning existing pending verification under rate limit", email=email, household_id=str(existing.id))
+                return {"pendingId": str(existing.id), "to": mask_email(email)}
+        # Otherwise, still rate limited
         raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
 
     # Reuse or create a household for unverified flows
@@ -407,7 +413,13 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
         db.add(household)
         db.flush()
 
-    # Always issue a fresh code for unverified accounts (cancel/resume safe)
+    # If there's a non-expired pending OTP, re-use it without sending another email
+    if household.email_verification_token_hash and household.email_verification_expires_at and \
+       datetime.now(pytz.UTC) <= household.email_verification_expires_at:
+        logger.info("Reusing existing non-expired OTP", email=email, household_id=str(household.id))
+        return {"pendingId": str(household.id), "to": mask_email(email)}
+
+    # Otherwise, generate and send a fresh code for unverified accounts (cancel/resume safe)
     code = generate_otp()
     household.email_verification_token_hash = hash_token(code)
     household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
