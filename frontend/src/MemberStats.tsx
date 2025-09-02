@@ -35,6 +35,7 @@ const DEFAULT_GOAL = 3;
 function MemberStats({ memberId }: Props) {
   const [stats, setStats] = useState<MemberStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Initialize goal from localStorage immediately
@@ -125,6 +126,7 @@ function MemberStats({ memberId }: Props) {
           console.error('Error refreshing selected member stats:', error);
         } finally {
           setIsLoading(false);
+          setIsInitialLoad(false);
         }
       } else if (memberId && isValidUUID(memberId)) {
         // Re-fetch stats for individual member
@@ -252,6 +254,7 @@ function MemberStats({ memberId }: Props) {
         }
       } finally {
         setIsLoading(false);
+        setIsInitialLoad(false);
       }
     };
     fetchStats();
@@ -711,6 +714,7 @@ function MemberStats({ memberId }: Props) {
           setError('Network error. Please try again.');
         } finally {
           setIsLoading(false);
+          setIsInitialLoad(false);
         }
       };
       
@@ -718,7 +722,7 @@ function MemberStats({ memberId }: Props) {
     }
   }, [selectedMemberId, memberId]);
 
-  if (isLoading) {
+  if (isLoading && isInitialLoad) {
     return (
       <div className="min-h-screen w-full bg-gray-900 p-4">
         <div className="max-w-4xl mx-auto">
@@ -781,7 +785,16 @@ function MemberStats({ memberId }: Props) {
   const ribbonEmoji = isGoalAchieved || isHotStreak ? '🏆' : '🥊';
 
   return (
-    <div className="min-h-screen w-full bg-gray-900 font-poppins overflow-x-hidden">
+    <div className="min-h-screen w-full bg-gray-900 font-poppins overflow-x-hidden relative">
+      {/* Subtle loading overlay for member switching */}
+      {isLoading && !isInitialLoad && (
+        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="bg-gray-800 rounded-lg px-4 py-2 flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500" />
+            <span className="text-white text-sm">Loading member...</span>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto space-y-6">
         {/* QR Code Section (no card/box, always at the top) */}
         <div className="flex justify-center my-6">

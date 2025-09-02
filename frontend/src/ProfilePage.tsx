@@ -12,6 +12,7 @@ function ProfilePage() {
   const [searchParams] = useSearchParams();
   const [memberId, setMemberIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showToolMenu, setShowToolMenu] = useState(false);
 
 
@@ -34,6 +35,7 @@ function ProfilePage() {
         setMemberIdState('family');
       }
       setIsLoading(false);
+      setIsInitialLoad(false);
       
       // Replace browser history to keep family email
       window.history.replaceState(null, '', `/profile?email=${encodeURIComponent(urlEmail)}`);
@@ -42,6 +44,7 @@ function ProfilePage() {
       setMemberId(urlMemberId);
       setMemberIdState(urlMemberId);
       setIsLoading(false);
+      setIsInitialLoad(false);
       
       // Replace browser history to prevent going back to home page
       window.history.replaceState(null, '', `/profile?id=${urlMemberId}`);
@@ -50,6 +53,7 @@ function ProfilePage() {
       const localMemberId = getMemberId();
       setMemberIdState(localMemberId);
       setIsLoading(false);
+      setIsInitialLoad(false);
       
       // Replace browser history to prevent going back to home page
       if (localMemberId) {
@@ -58,7 +62,7 @@ function ProfilePage() {
     }
   }, [searchParams]);
 
-  if (isLoading) {
+  if (isLoading && isInitialLoad) {
     return (
       <div className="min-h-screen bg-gray-900 p-4">
         <div className="max-w-4xl mx-auto">
