@@ -148,6 +148,56 @@ function MemberCheckin() {
       return;
     }
 
+    // Check if user has account number stored (for PWA users who need to re-authenticate)
+    const savedAccountNumber = localStorage.getItem('household_code');
+    if (savedAccountNumber) {
+      // Auto-sign in with stored account number
+      setStatus("loading");
+      setMessage("Signing you in automatically...");
+      
+      // Simulate the sign-in process with the stored account number
+      setTimeout(async () => {
+        try {
+          const response = await fetch(`${getApiUrl()}/api/verify-account`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_number: savedAccountNumber })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Store the session data
+            localStorage.setItem('member_email', data.email);
+            localStorage.setItem('member_id', data.member_id);
+            
+            if (data.family_members && data.family_members.length > 1) {
+              localStorage.setItem('family_members', JSON.stringify(data.family_members));
+              setStatus("success");
+              setMessage("Welcome back! Redirecting to your family profile...");
+              setTimeout(() => {
+                window.location.href = `/profile?email=${encodeURIComponent(data.email)}`;
+              }, 1500);
+            } else {
+              setStatus("success");
+              setMessage("Welcome back! Redirecting to your profile...");
+              setTimeout(() => {
+                window.location.href = `/profile?id=${data.member_id}`;
+              }, 1500);
+            }
+            return;
+          }
+        } catch (error) {
+          console.error('Auto sign-in failed:', error);
+        }
+        
+        // If auto sign-in fails, fall back to manual entry
+        setStatus("register");
+        setMessage("");
+      }, 1000);
+      return;
+    }
+
     // Not logged in - show registration form
     setStatus("register");
     setMessage("");

@@ -2408,6 +2408,51 @@ async def admin_get_household_by_code(request: Request, account_code: str, db: S
         "member_count": len(member_data)
     }
 
+@app.post("/api/verify-account")
+@limiter.limit("10/minute")
+async def verify_account(request: Request, data: dict = Body(...), db: Session = Depends(get_db)):
+    """Verify account number and return member information for auto sign-in"""
+    account_number = data.get("account_number", "").strip()
+    if not account_number:
+        raise HTTPException(status_code=400, detail="Account number is required")
+    
+    # Validate account code format
+    if not is_valid_account_code(account_number):
+        raise HTTPException(status_code=400, detail="Invalid account code format")
+    
+    # Find household by code (case-insensitive)
+    from sqlalchemy import func
+    household = db.query(models.Household).filter(
+        func.upper(models.Household.household_code) == account_number.upper()
+    ).first()
+    
+    if not household:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Get all members for this household
+    members = db.query(models.Member).filter(
+        models.Member.household_id == household.id,
+        models.Member.deleted_at.is_(None)
+    ).order_by(models.Member.name).all()
+    
+    if not members:
+        raise HTTPException(status_code=404, detail="No members found for this account")
+    
+    # Return the primary member (first one) and family info
+    primary_member = members[0]
+    family_members = [{"id": str(m.id), "name": m.name, "email": m.email} for m in members]
+    
+    logger.info("Account verification successful", account_code=account_number, member_count=len(members))
+    
+    return {
+        "member_id": str(primary_member.id),
+        "email": primary_member.email,
+        "name": primary_member.name,
+        "household_code": household.household_code,
+        "family_members": family_members,
+        "is_family": len(members) > 1
+    }
+
 # Admin authentication removed - admin routes are now open access 
 
 # Lightweight session probe for app bootstrap
