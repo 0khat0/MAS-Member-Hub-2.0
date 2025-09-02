@@ -219,8 +219,8 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
           </button>
         </div>
       </div>
-      {/* Main Content - tighter vertical spacing */}
-      <div className="flex-1 flex flex-col justify-start px-4 sm:px-6 pt-4 sm:pt-6 pb-6">
+      {/* Main Content - centered within remaining viewport */}
+      <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 py-6">
            {/* Error Message - Mobile Optimized */}
            {error && (
              <div className="mb-3 sm:mb-4 text-center">

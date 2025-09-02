@@ -75,22 +75,9 @@ def generate_qr_code_base64(data: str, size: int = 200) -> str:
 
 
 def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
-    """Send a welcome email with account number and QR code"""
+    """Send a welcome email with account number (no QR)."""
     
-    # Generate QR code that matches what users see on their profile page
-    qr_data = to  # Use their email address as the QR code data (family identifier)
-    qr_png_b64 = generate_qr_code_base64(qr_data)
-    # Prepare inline attachment for Gmail via Resend (content_id for cid:)
-    qr_attachment = {
-        "filename": "qr.png",
-        "content": qr_png_b64,
-        "content_id": "member_qr",
-        "mime_type": "image/png",
-    }
-    # Public fallback URL if client blocks cid (some clients do). Optional.
-    backend_public = os.getenv("BACKEND_PUBLIC_URL", "")
-    safe_data = quote_plus(to)
-    qr_url = f"{backend_public.rstrip('/')}/v1/qr.png?data={safe_data}&size=200"
+    # No QR in this email per product decision
     
     subject = "Welcome to MAS Member Hub! 🥊"
     
@@ -341,31 +328,13 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
               </tr>
             </table>
             
-            <div class="qr-section">
-                <h3>Your Member QR Code</h3>
-                <div class="qr-code" style="text-align:center;">
-                    <!-- Inline CID for Gmail & Outlook -->
-                    <img src="cid:member_qr" alt="Member QR Code" width="200" height="200" style="border:2px solid #ddd; border-radius:8px; display:block; margin:0 auto; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic;">
-                </div>
-                <p style="font-size: 14px; color: #6c757d;">
-                    <strong>Tip:</strong> Long-press the QR code to save it to your photos
-                </p>
-                <!-- Download button (great for Outlook users to save the QR) -->
-                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px auto 0 auto;">
-                  <tr>
-                    <td align="center" bgcolor="#111111" style="border-radius:6px;">
-                      <a href="{qr_url}" target="_blank" style="display:inline-block; padding:10px 16px; color:#ffffff; text-decoration:none; font-weight:600; border-radius:6px;">Open / Download QR</a>
-                    </td>
-                  </tr>
-                </table>
-            </div>
+            
             
             <div class="instructions">
                 <h3>🚀 Getting Started</h3>
                 <ul>
                     <li><strong>Sign In:</strong> Use your account number to sign in to the Member Hub</li>
                     <li><strong>Check In:</strong> Show your QR code at the gym for quick check-ins</li>
-                    <li><strong>Add Family:</strong> Invite family members to join your household</li>
                     <li><strong>Track Progress:</strong> Monitor your check-in streaks and attendance</li>
                 </ul>
             </div>
@@ -383,6 +352,6 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
     </html>
     """
     
-    send_email(to, subject, html, attachments=[qr_attachment])
+    send_email(to, subject, html)
 
 
