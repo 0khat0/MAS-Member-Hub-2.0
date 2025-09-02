@@ -270,6 +270,11 @@ function MemberStats({ memberId }: Props) {
         if (cached) {
           setFamilyMembers(cached);
           setIsFamily((cached || []).length > 1);
+          // Dispatch event so header/tools can react immediately
+          try {
+            localStorage.setItem('family_members', JSON.stringify((cached || []).map((m:any)=>m.name)));
+          } catch {}
+          window.dispatchEvent(new CustomEvent('mas:familyMembersUpdated'));
           if (memberId === 'family' && cached && cached.length > 0) {
             setSelectedMemberId(cached[0].id);
             setEditName(cached[0].name);
@@ -293,6 +298,7 @@ function MemberStats({ memberId }: Props) {
             const memberNames = data.map((m: any) => m.name);
             localStorage.setItem('family_members', JSON.stringify(memberNames));
             setIsFamily((data || []).length > 1);
+            window.dispatchEvent(new CustomEvent('mas:familyMembersUpdated'));
             if (memberId === 'family' && data && data.length > 0) {
               setSelectedMemberId(data[0].id);
               setEditName(data[0].name);
@@ -502,6 +508,16 @@ function MemberStats({ memberId }: Props) {
             localStorage.setItem('member_email', remainingMember.email);
           }
         }
+        // Emit update so header/tools can update delete action
+        try {
+          const names = familyMembers.filter(m => m.id !== memberIdToDelete).map(m => m.name);
+          if (names.length > 1) {
+            localStorage.setItem('family_members', JSON.stringify(names));
+          } else {
+            localStorage.removeItem('family_members');
+          }
+        } catch {}
+        window.dispatchEvent(new CustomEvent('mas:familyMembersUpdated'));
       } else {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         alert(`Failed to delete ${memberName}: ${errorData.detail || 'Unknown error'}`);
@@ -560,6 +576,7 @@ function MemberStats({ memberId }: Props) {
           // Update localStorage
           const memberNames = result.all_family_members.map((m: any) => m.name);
           localStorage.setItem('family_members', JSON.stringify(memberNames));
+          window.dispatchEvent(new CustomEvent('mas:familyMembersUpdated'));
           
           // Switch to family mode if not already
           if (!isFamily) {

@@ -13,6 +13,16 @@ function ProfilePage() {
   const [memberId, setMemberIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isFamilyUI, setIsFamilyUI] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('family_members');
+      if (!saved) return false;
+      const arr = JSON.parse(saved);
+      return Array.isArray(arr) && arr.length > 1;
+    } catch {
+      return false;
+    }
+  });
   const [showToolMenu, setShowToolMenu] = useState(false);
 
 
@@ -61,6 +71,37 @@ function ProfilePage() {
       }
     }
   }, [searchParams]);
+
+  // Keep UI in sync with family membership changes
+  useEffect(() => {
+    const updateFromStorage = () => {
+      try {
+        const saved = localStorage.getItem('family_members');
+        if (!saved) {
+          setIsFamilyUI(false);
+          return;
+        }
+        const arr = JSON.parse(saved);
+        setIsFamilyUI(Array.isArray(arr) && arr.length > 1);
+      } catch {
+        setIsFamilyUI(false);
+      }
+    };
+
+    const onCustom = (e: Event) => {
+      // Also update from localStorage on custom event to avoid trusting detail blindly
+      updateFromStorage();
+    };
+
+    window.addEventListener('storage', updateFromStorage);
+    window.addEventListener('mas:familyMembersUpdated', onCustom as EventListener);
+    // Run once at mount to ensure freshness
+    updateFromStorage();
+    return () => {
+      window.removeEventListener('storage', updateFromStorage);
+      window.removeEventListener('mas:familyMembersUpdated', onCustom as EventListener);
+    };
+  }, []);
 
   if (isLoading && isInitialLoad) {
     return (
@@ -254,7 +295,7 @@ function ProfilePage() {
                   </svg>
                   Report Issue
                 </button>
-                {memberId === 'family' ? (
+                {isFamilyUI ? (
                   <button
                     onClick={handleDeleteFamily}
                     className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 transition-colors duration-200 flex items-center gap-3"
