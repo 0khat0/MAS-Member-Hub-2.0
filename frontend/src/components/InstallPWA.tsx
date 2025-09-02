@@ -60,6 +60,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
   const [deferred, setDeferred] = React.useState<BeforeInstallPromptEvent | null>(null);
   const [show, setShow] = React.useState(false);
   const [showIOSHelp, setShowIOSHelp] = React.useState(false);
+  const [showAndroidHelp, setShowAndroidHelp] = React.useState(false);
   const [installed, setInstalled] = React.useState(isStandalone() || localStorage.getItem(LS_INSTALLED) === "1");
 
   React.useEffect(() => {
@@ -85,6 +86,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
       setInstalled(true);
       setShow(false);
       setShowIOSHelp(false);
+      setShowAndroidHelp(false);
     };
     window.addEventListener("appinstalled", onInstalled);
 
@@ -95,6 +97,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
         setInstalled(true);
         setShow(false);
         setShowIOSHelp(false);
+        setShowAndroidHelp(false);
       }
     };
     document.addEventListener("visibilitychange", onVis);
@@ -137,8 +140,11 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
     } else if (isiOS()) {
       // Show iOS instruction sheet
       setShowIOSHelp(true);
+    } else if (isAndroid()) {
+      // Show Android instruction sheet
+      setShowAndroidHelp(true);
     } else {
-      // No prompt available and not iOS; hide
+      // No prompt available and not iOS/Android; hide
       rememberDismiss();
       setShow(false);
     }
@@ -148,6 +154,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
     rememberDismiss();
     setShow(false);
     setShowIOSHelp(false);
+    setShowAndroidHelp(false);
   }
 
   // Minimal inline styles so it looks fine without a CSS framework
@@ -192,7 +199,7 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
   return (
     <div className={className}>
       {/* Compact banner */}
-      {!showIOSHelp && (
+      {!showIOSHelp && !showAndroidHelp && (
         <div style={cardStyle} role="dialog" aria-live="polite" aria-label="Install app">
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>📲</span>
@@ -237,6 +244,43 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
               onClick={() => {
                 // Hide the iOS help sheet and show the main install prompt again
                 setShowIOSHelp(false);
+              }}
+              style={btnStyle}
+            >
+              Okay
+            </button>
+            <button onClick={handleDismiss} style={ghostBtn}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Android help sheet */}
+      {showAndroidHelp && (
+        <div style={cardStyle} role="dialog" aria-live="polite" aria-label="Add to Home Screen instructions">
+          <div style={{ fontSize: 14, lineHeight: 1.4, marginBottom: 8 }}>
+            <strong>Android</strong>
+            <ol style={{ margin: "6px 0 0 16px", padding: 0 }}>
+              <li style={{ marginBottom: 4 }}>
+                Tap the <span aria-label="Menu">⋮</span> <em>Menu</em> button in your browser.
+              </li>
+              <li style={{ marginBottom: 4 }}>
+                Look for <em>Add to Home screen</em> or <em>Install app</em>.
+              </li>
+              <li style={{ marginBottom: 4 }}>
+                Tap <em>Add</em> or <em>Install</em> to add {appName} to your home screen.
+              </li>
+            </ol>
+            <div style={{ opacity: 0.8, marginTop: 8 }}>
+              Tip: If you don't see the option, try using Chrome browser for the best experience.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => {
+                // Hide the Android help sheet and show the main install prompt again
+                setShowAndroidHelp(false);
               }}
               style={btnStyle}
             >
