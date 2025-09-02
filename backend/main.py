@@ -23,6 +23,7 @@ from auth.otp import is_valid_account_code
 from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
 from time import perf_counter
+import io
 from sqlalchemy import text
 import jwt
 
@@ -328,6 +329,36 @@ async def get_metrics():
 from fastapi import APIRouter
 from pydantic import EmailStr
 router = APIRouter(prefix="/v1")
+
+# Public QR image endpoint for emails and clients that need a direct PNG URL
+@router.get("/qr.png")
+def v1_qr_png(data: str, size: int = 200):
+    """
+    Generate a QR code PNG for the provided data.
+    Do not embed secrets in 'data'.
+    """
+    try:
+        import qrcode
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=max(1, int(size // 40)) or 5,
+            border=4,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        png_bytes = buf.getvalue()
+        headers = {
+            "Cache-Control": "public, max-age=86400",
+        }
+        return Response(content=png_bytes, media_type="image/png", headers=headers)
+    except Exception as e:
+        logger.error("qr_png_generation_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to generate QR image")
 
 # Lightweight session probe for app bootstrap
 @router.get("/auth/session")

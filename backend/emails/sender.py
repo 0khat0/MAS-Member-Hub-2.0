@@ -3,15 +3,18 @@ import json
 import base64
 import io
 from urllib import request
+from urllib.parse import quote_plus
 import qrcode
 
 
-def send_email(to: str, subject: str, html: str) -> None:
+def send_email(to: str, subject: str, html: str, attachments: list | None = None) -> None:
     api_key = os.getenv("RESEND_API_KEY")
     email_from = os.getenv("EMAIL_FROM", "MAS Hub <no-reply@localhost>")
     
     if not api_key:
         print(f"[DEV EMAIL] To: {to} | Subject: {subject}\n{html}")
+        if attachments:
+            print(f"[DEV EMAIL] Attachments: {[a.get('filename') for a in attachments]}")
         return
 
     payload = {
@@ -20,6 +23,9 @@ def send_email(to: str, subject: str, html: str) -> None:
         "subject": subject,
         "html": html,
     }
+    if attachments:
+        # Resend expects base64 content for attachments; content_id enables cid: inline images
+        payload["attachments"] = attachments
     data = json.dumps(payload).encode("utf-8")
     req = request.Request(
         url="https://api.resend.com/emails",
@@ -72,10 +78,19 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
     """Send a welcome email with account number and QR code"""
     
     # Generate QR code that matches what users see on their profile page
-    # For new users, we'll use their email as the QR code data (same as family accounts)
-    # This ensures consistency between the email and what they see in the app
-    qr_data = to  # Use their email address as the QR code data
-    qr_code_base64 = generate_qr_code_base64(qr_data)
+    qr_data = to  # Use their email address as the QR code data (family identifier)
+    qr_png_b64 = generate_qr_code_base64(qr_data)
+    # Prepare inline attachment for Gmail via Resend (content_id for cid:)
+    qr_attachment = {
+        "filename": "qr.png",
+        "content": qr_png_b64,
+        "content_id": "member_qr",
+        "mime_type": "image/png",
+    }
+    # Public fallback URL if client blocks cid (some clients do). Optional.
+    backend_public = os.getenv("BACKEND_PUBLIC_URL", "")
+    safe_data = quote_plus(to)
+    qr_url = f"{backend_public.rstrip('/')}/v1/qr.png?data={safe_data}&size=200"
     
     subject = "Welcome to MAS Member Hub! 🥊"
     
@@ -313,22 +328,36 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
                 <p>Your account has been successfully created and verified</p>
             </div>
             
-            <div class="account-section">
-                <h2 style="margin: 0 0 15px 0;">Your Account Number</h2>
-                <div class="account-number">{account_number}</div>
-                <p style="margin: 10px 0 0 0; opacity: 0.9;">Keep this safe - you'll need it to sign in!</p>
-            </div>
+            <!-- Account Number Section (table-based for Outlook) -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#dc3545; border-radius:10px; margin:25px 0;">
+              <tr>
+                <td align="center" style="padding:25px;">
+                  <h2 style="margin:0 0 15px 0; color:#ffffff; font-size:20px; font-weight:600;">Your Account Number</h2>
+                  <div style="display:inline-block; background:#ffffff; color:#111111; padding:12px 16px; border-radius:8px;">
+                    <span class="account-number" style="font-size:32px; line-height:1.2; letter-spacing:2px; font-family:'Courier New', 'Monaco', 'Menlo', monospace;">{account_number}</span>
+                  </div>
+                  <p style="margin:12px 0 0 0; color:#ffffff; opacity:0.95; font-size:14px;">Keep this safe — you'll need it to sign in!</p>
+                </td>
+              </tr>
+            </table>
             
             <div class="qr-section">
                 <h3>Your Member QR Code</h3>
-                <div class="qr-code">
-                    <img src="data:image/png;base64,{qr_code_base64}" 
-                         alt="Member QR Code" 
-                         style="width: 200px; height: 200px; border: 2px solid #ddd; border-radius: 8px;">
+                <div class="qr-code" style="text-align:center;">
+                    <!-- Inline CID for Gmail & Outlook -->
+                    <img src="cid:member_qr" alt="Member QR Code" width="200" height="200" style="border:2px solid #ddd; border-radius:8px; display:block; margin:0 auto; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic;">
                 </div>
                 <p style="font-size: 14px; color: #6c757d;">
                     <strong>Tip:</strong> Long-press the QR code to save it to your photos
                 </p>
+                <!-- Download button (great for Outlook users to save the QR) -->
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px auto 0 auto;">
+                  <tr>
+                    <td align="center" bgcolor="#111111" style="border-radius:6px;">
+                      <a href="{qr_url}" target="_blank" style="display:inline-block; padding:10px 16px; color:#ffffff; text-decoration:none; font-weight:600; border-radius:6px;">Open / Download QR</a>
+                    </td>
+                  </tr>
+                </table>
             </div>
             
             <div class="instructions">
@@ -354,6 +383,6 @@ def send_welcome_email(to: str, account_number: str, household_id: str) -> None:
     </html>
     """
     
-    send_email(to, subject, html)
+    send_email(to, subject, html, attachments=[qr_attachment])
 
 

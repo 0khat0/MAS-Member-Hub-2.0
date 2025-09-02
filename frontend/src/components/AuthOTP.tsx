@@ -190,36 +190,37 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
-      {/* Header - Mobile Optimized */}
-      <div className="flex justify-between items-start p-4 sm:p-6">
-        <div className="text-left flex-1">
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-1">Enter Code</h1>
-          <p className="text-gray-400 text-xs sm:text-sm mb-1">We sent a verification code to</p>
-          <p className="text-blue-400 font-medium text-sm sm:text-base break-all mb-4 sm:mb-6">{emailMasked}</p>
+      {/* Header - keep visible and reduce top spacing */}
+      <div className="sticky top-0 z-10 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/80">
+        <div className="flex justify-between items-center px-4 py-3 sm:px-6 sm:py-4 border-b border-white/5">
+          <div className="text-left flex-1">
+            <h1 className="text-lg sm:text-xl font-bold text-white mb-0">Enter Code</h1>
+            <p className="text-gray-400 text-xs sm:text-sm mt-0.5">We sent a verification code to</p>
+            <p className="text-blue-400 font-medium text-sm sm:text-base break-all mt-1">{emailMasked}</p>
+          </div>
+          <button
+            onClick={handleCancel}
+            disabled={isNavigating}
+            className="ml-3 text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
+            title="Cancel"
+            type="button"
+            aria-label="Cancel"
+          >
+            {isNavigating ? (
+              <svg className="animate-spin w-5 h-5 sm:w-6 sm:h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+          </button>
         </div>
-        <button
-          onClick={handleCancel}
-          disabled={isNavigating}
-          className="text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
-          title="Cancel"
-          type="button"
-          aria-label="Cancel"
-        >
-          {isNavigating ? (
-            <svg className="animate-spin w-5 h-5 sm:w-6 sm:h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          ) : (
-            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          )}
-        </button>
       </div>
-
-                             {/* Main Content - Mobile Optimized */}
-         <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 pb-4 sm:pb-6">
+      {/* Main Content - tighter vertical spacing */}
+      <div className="flex-1 flex flex-col justify-start px-4 sm:px-6 pt-4 sm:pt-6 pb-6">
            {/* Error Message - Mobile Optimized */}
            {error && (
              <div className="mb-3 sm:mb-4 text-center">
@@ -236,7 +237,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
            <form onSubmit={submit} className="space-y-4 sm:space-y-6">
            <div className="space-y-3 sm:space-y-4">
              <div className="text-center">
-               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 mb-2 sm:mb-3 block">
+               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2 block">
                  Enter the 6-digit code
                </label>
              </div>
@@ -252,7 +253,7 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
                  value={code}
                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                  onKeyDown={handleKeyDown}
-                 className="w-full bg-gray-800/50 backdrop-blur-sm border-2 border-gray-600 rounded-2xl px-6 sm:px-8 py-4 sm:py-6 text-white tracking-[0.3em] sm:tracking-[0.5em] text-center text-xl sm:text-2xl font-mono placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 hover:border-gray-500 touch-manipulation"
+                 className="w-full bg-gray-800/50 backdrop-blur-sm border-2 border-gray-600 rounded-2xl px-5 sm:px-7 py-3.5 sm:py-5 text-white tracking-[0.3em] sm:tracking-[0.45em] text-center text-xl sm:text-2xl font-mono placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 hover:border-gray-500 touch-manipulation"
                  disabled={loading}
                  autoComplete="one-time-code"
                  autoCorrect="off"
