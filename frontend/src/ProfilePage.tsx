@@ -29,6 +29,7 @@ function ProfilePage() {
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showIndicator, setShowIndicator] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ function ProfilePage() {
       if (deltaY > 0) {
         setIsPulling(true);
         setPullDistance(Math.min(deltaY, 100));
+        setShowIndicator(true);
       }
     };
 
@@ -63,13 +65,18 @@ function ProfilePage() {
         setIsRefreshing(true);
         setIsPulling(false);
         setPullDistance(0);
+        setShowIndicator(true);
         // Remount data components to re-fetch
         setRefreshVersion((v) => v + 1);
-        // Keep spinner visible briefly for smoothness
-        setTimeout(() => setIsRefreshing(false), 900);
+        // Hide spinner after a brief moment regardless of scroll position
+        window.setTimeout(() => {
+          setIsRefreshing(false);
+          setShowIndicator(false);
+        }, 900);
       } else {
         setIsPulling(false);
         setPullDistance(0);
+        setShowIndicator(false);
       }
       monitoring = false;
     };
@@ -77,11 +84,23 @@ function ProfilePage() {
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove', onTouchMove, { passive: true });
     window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd as any);
+    // Hide indicator on scroll if not actively refreshing
+    const onScroll = () => {
+      if (!isRefreshing) {
+        setIsPulling(false);
+        setPullDistance(0);
+        setShowIndicator(false);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       window.removeEventListener('touchstart', onTouchStart as any);
       window.removeEventListener('touchmove', onTouchMove as any);
       window.removeEventListener('touchend', onTouchEnd as any);
+      window.removeEventListener('touchcancel', onTouchEnd as any);
+      window.removeEventListener('scroll', onScroll as any);
     };
   }, [isRefreshing, pullDistance]);
 
@@ -318,7 +337,7 @@ function ProfilePage() {
         className="fixed left-0 right-0 top-0 z-40 flex justify-center pointer-events-none"
         style={{ transform: `translateY(${isPulling ? Math.min(pullDistance, 60) : 0}px)`, transition: isPulling ? 'none' : 'transform 200ms ease' }}
       >
-        {(isPulling || isRefreshing) && (
+        {showIndicator && (
           <div className="mt-2 w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin bg-transparent"></div>
         )}
       </div>
