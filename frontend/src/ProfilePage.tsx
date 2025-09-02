@@ -25,39 +25,53 @@ function ProfilePage() {
   });
   const [showToolMenu, setShowToolMenu] = useState(false);
 
-  // Pull-to-refresh for mobile: pull down at top to refresh page data
+  // Pull-to-refresh (smooth, in-app) for mobile
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+
   useEffect(() => {
     let startY = 0;
     let monitoring = false;
-    let shouldRefresh = false;
     const threshold = 70; // pixels pulled to trigger refresh
 
     const onTouchStart = (e: TouchEvent) => {
-      // Only start monitoring when scrolled to top
+      if (isRefreshing) return;
       if (window.scrollY <= 0) {
         startY = e.touches[0].clientY;
         monitoring = true;
-        shouldRefresh = false;
+        setIsPulling(false);
+        setPullDistance(0);
       } else {
         monitoring = false;
       }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!monitoring) return;
+      if (!monitoring || isRefreshing) return;
       const deltaY = e.touches[0].clientY - startY;
-      if (deltaY > threshold) {
-        shouldRefresh = true;
+      if (deltaY > 0) {
+        setIsPulling(true);
+        setPullDistance(Math.min(deltaY, 100));
       }
     };
 
     const onTouchEnd = () => {
-      if (monitoring && shouldRefresh) {
-        // Simple refresh; components will re-fetch their data on load
-        window.location.reload();
+      if (!monitoring || isRefreshing) return;
+      if (pullDistance > threshold) {
+        setIsRefreshing(true);
+        setIsPulling(false);
+        setPullDistance(0);
+        // Remount data components to re-fetch
+        setRefreshVersion((v) => v + 1);
+        // Keep spinner visible briefly for smoothness
+        setTimeout(() => setIsRefreshing(false), 900);
+      } else {
+        setIsPulling(false);
+        setPullDistance(0);
       }
       monitoring = false;
-      shouldRefresh = false;
     };
 
     window.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -69,7 +83,7 @@ function ProfilePage() {
       window.removeEventListener('touchmove', onTouchMove as any);
       window.removeEventListener('touchend', onTouchEnd as any);
     };
-  }, []);
+  }, [isRefreshing, pullDistance]);
 
 
   useEffect(() => {
@@ -299,6 +313,15 @@ function ProfilePage() {
 
   return (
     <div className="relative">
+      {/* Pull-to-refresh indicator */}
+      <div
+        className="fixed left-0 right-0 top-0 z-40 flex justify-center pointer-events-none"
+        style={{ transform: `translateY(${isPulling ? Math.min(pullDistance, 60) : 0}px)`, transition: isPulling ? 'none' : 'transform 200ms ease' }}
+      >
+        {(isPulling || isRefreshing) && (
+          <div className="mt-2 w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin bg-transparent"></div>
+        )}
+      </div>
       {/* Tool menu button - top right corner */}
       <div className="fixed top-4 right-4 z-50">
         <button
@@ -379,7 +402,8 @@ function ProfilePage() {
           }} />
         </div>
       )}
-      <MemberStats memberId={memberId} />
+      {/* Key forces re-mount after pull-to-refresh to trigger fresh data fetch */}
+      <MemberStats key={`stats-${memberId}-${refreshVersion}`} memberId={memberId} />
       
       {/* Add to Home Screen prompt */}
       <InstallPWA appName="MAS Hub" />
