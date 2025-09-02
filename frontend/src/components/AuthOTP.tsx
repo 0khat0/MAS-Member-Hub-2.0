@@ -210,6 +210,13 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
             <p className="text-gray-400 text-xs sm:text-sm">We sent a verification code to</p>
             <p className="text-blue-400 font-medium text-sm sm:text-base break-all">{emailMasked}</p>
           </div>
+
+          {/* Small spinner while an action is in progress */}
+          {(loading || resendLoading) && (
+            <div className="flex justify-center mb-3" aria-live="polite" aria-busy="true">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
           
            {/* OTP Input Form - Mobile Optimized */}
            <form onSubmit={submit} className="space-y-4 sm:space-y-6">
