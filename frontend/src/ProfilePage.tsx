@@ -25,6 +25,52 @@ function ProfilePage() {
   });
   const [showToolMenu, setShowToolMenu] = useState(false);
 
+  // Pull-to-refresh for mobile: pull down at top to refresh page data
+  useEffect(() => {
+    let startY = 0;
+    let monitoring = false;
+    let shouldRefresh = false;
+    const threshold = 70; // pixels pulled to trigger refresh
+
+    const onTouchStart = (e: TouchEvent) => {
+      // Only start monitoring when scrolled to top
+      if (window.scrollY <= 0) {
+        startY = e.touches[0].clientY;
+        monitoring = true;
+        shouldRefresh = false;
+      } else {
+        monitoring = false;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!monitoring) return;
+      const deltaY = e.touches[0].clientY - startY;
+      if (deltaY > threshold) {
+        shouldRefresh = true;
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (monitoring && shouldRefresh) {
+        // Simple refresh; components will re-fetch their data on load
+        window.location.reload();
+      }
+      monitoring = false;
+      shouldRefresh = false;
+    };
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart as any);
+      window.removeEventListener('touchmove', onTouchMove as any);
+      window.removeEventListener('touchend', onTouchEnd as any);
+    };
+  }, []);
+
 
   useEffect(() => {
     // Check URL parameters - support both member ID and family email

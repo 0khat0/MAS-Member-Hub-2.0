@@ -189,10 +189,10 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="flex flex-col">
       {/* Header removed per user request to avoid top clutter */}
-      {/* Main Content - centered within remaining viewport */}
-      <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 py-6">
+      {/* Main Content - keep compact; rely on parent container sizing */}
+      <div className="px-4 sm:px-6 py-4">
            {/* Error Message - Mobile Optimized */}
            {error && (
              <div className="mb-3 sm:mb-4 text-center">
