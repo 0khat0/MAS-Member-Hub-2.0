@@ -118,8 +118,7 @@ export default function HomeAuth() {
 
   if (pendingId) {
     return (
-      <div className="max-w-sm mx-auto p-4 space-y-3">
-        <h2 className="text-xl font-semibold">Enter the code</h2>
+      <div className="max-w-sm mx-auto p-4">
         <AuthOTP 
           pendingId={pendingId} 
           emailMasked={emailMasked} 

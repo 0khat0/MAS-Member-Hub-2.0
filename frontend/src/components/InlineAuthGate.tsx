@@ -121,7 +121,7 @@ export default function InlineAuthGate() {
           </form>
         ) : (
           <div>
-            <h2 className="text-lg font-semibold mb-2 text-center">Enter the code</h2>
+            <h2 className="sr-only">Enter the code</h2>
             <AuthOTP 
               pendingId={pendingId} 
               emailMasked={emailMasked} 

@@ -189,36 +189,8 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
-      {/* Header - keep visible and reduce top spacing */}
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/80">
-        <div className="flex justify-between items-center px-4 py-3 sm:px-6 sm:py-4 border-b border-white/5">
-          <div className="text-left flex-1">
-            <h1 className="text-lg sm:text-xl font-bold text-white mb-0">Enter Code</h1>
-            <p className="text-gray-400 text-xs sm:text-sm mt-0.5">We sent a verification code to</p>
-            <p className="text-blue-400 font-medium text-sm sm:text-base break-all mt-1">{emailMasked}</p>
-          </div>
-          <button
-            onClick={handleCancel}
-            disabled={isNavigating}
-            className="ml-3 text-gray-400 hover:text-white transition-colors p-2 sm:p-3 rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
-            title="Cancel"
-            type="button"
-            aria-label="Cancel"
-          >
-            {isNavigating ? (
-              <svg className="animate-spin w-5 h-5 sm:w-6 sm:h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Header removed per user request to avoid top clutter */}
       {/* Main Content - centered within remaining viewport */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 py-6">
            {/* Error Message - Mobile Optimized */}
@@ -233,34 +205,41 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
              </div>
            )}
            
+          {/* Info block (replaces header) */}
+          <div className="text-center mb-4 sm:mb-6">
+            <p className="text-gray-400 text-xs sm:text-sm">We sent a verification code to</p>
+            <p className="text-blue-400 font-medium text-sm sm:text-base break-all">{emailMasked}</p>
+          </div>
+          
            {/* OTP Input Form - Mobile Optimized */}
            <form onSubmit={submit} className="space-y-4 sm:space-y-6">
-           <div className="space-y-3 sm:space-y-4">
+           <div className="space-y-4">
              <div className="text-center">
-               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2 block">
+               <label htmlFor="otp-input" className="text-base sm:text-lg font-medium text-gray-300 block">
                  Enter the 6-digit code
                </label>
              </div>
              
-             <div className="relative">
-               <input
-                 ref={inputRef}
-                 id="otp-input"
-                 inputMode="numeric"
-                 pattern="[0-9]*"
-                 maxLength={6}
-                 placeholder="000000"
-                 value={code}
-                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                 onKeyDown={handleKeyDown}
-                 className="w-full bg-gray-800/50 backdrop-blur-sm border-2 border-gray-600 rounded-2xl px-5 sm:px-7 py-3.5 sm:py-5 text-white tracking-[0.3em] sm:tracking-[0.45em] text-center text-xl sm:text-2xl font-mono placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 hover:border-gray-500 touch-manipulation"
-                 disabled={loading}
-                 autoComplete="one-time-code"
-                 autoCorrect="off"
-                 autoCapitalize="off"
-                 spellCheck="false"
-               />
-               <div className="absolute inset-0 pointer-events-none rounded-2xl border-2 border-transparent bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 opacity-0 transition-opacity duration-300 focus-within:opacity-100"></div>
+             <div className="w-full flex justify-center">
+               <div className="w-full max-w-[320px]">
+                 <input
+                   ref={inputRef}
+                   id="otp-input"
+                   inputMode="numeric"
+                   pattern="[0-9]*"
+                   maxLength={6}
+                   placeholder=""
+                   value={code}
+                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                   onKeyDown={handleKeyDown}
+                   className="w-full bg-gray-800/60 border border-gray-600 rounded-xl px-4 py-3 text-white text-center text-2xl sm:text-3xl font-mono tracking-normal focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
+                   disabled={loading}
+                   autoComplete="one-time-code"
+                   autoCorrect="off"
+                   autoCapitalize="off"
+                   spellCheck="false"
+                 />
+               </div>
              </div>
            </div>
 

@@ -192,7 +192,7 @@ function MemberCheckin() {
         {otpPendingId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
             <div className="w-full max-w-sm rounded-lg bg-gray-900 border border-gray-700 p-5 text-white shadow-xl">
-              <h2 className="text-lg font-semibold mb-2 text-center">Enter the code</h2>
+              <h2 className="sr-only">Enter the code</h2>
               <AuthOTP
                 pendingId={otpPendingId}
                 emailMasked={otpEmailMasked}
