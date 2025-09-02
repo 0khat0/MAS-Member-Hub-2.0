@@ -6,6 +6,7 @@ import MemberStats from './MemberStats';
 import FamilySwitch from './components/FamilySwitch';
 import { motion, AnimatePresence } from 'framer-motion';
 import InstallPWA from './components/InstallPWA';
+import { SkeletonProfile } from './components/Skeleton';
 
 function ProfilePage() {
   const [searchParams] = useSearchParams();
@@ -59,8 +60,10 @@ function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+      <div className="min-h-screen bg-gray-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          <SkeletonProfile />
+        </div>
       </div>
     );
   }

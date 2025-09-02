@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { isValidUUID, getApiUrl, clearMemberData, getEasternTime, getEasternDateString, getEasternDateTimeString, getMondayOfCurrentWeekEastern, getDailyMuayThaiMessage } from './utils';
 import QRCodeGenerator from './QRCodeGenerator';
 import { handleNameInputChange } from './utils/nameUtils';
+import { SkeletonStats } from './components/Skeleton';
 
 interface MemberStats {
   monthly_check_ins: number;
@@ -719,8 +720,10 @@ function MemberStats({ memberId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-48">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+      <div className="min-h-screen w-full bg-gray-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          <SkeletonStats />
+        </div>
       </div>
     );
   }

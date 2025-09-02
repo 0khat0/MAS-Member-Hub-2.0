@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
 import { getSessionOptional } from './lib/session'
 import { getHouseholdId, setHouseholdId, clearAppStorage } from './lib/storage'
+import Skeleton from './components/Skeleton'
 
 // Register custom service worker for PWA functionality
 if ('serviceWorker' in navigator) {
@@ -114,9 +115,16 @@ function BootstrapGate() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-3 text-white/80">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500" />
-        <div className="text-xs opacity-70">Starting…</div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4 text-white/80 p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500" />
+          <div className="text-sm opacity-70">Starting MAS Hub…</div>
+        </div>
+        <div className="w-full max-w-sm space-y-3">
+          <Skeleton variant="text" height="2rem" />
+          <Skeleton variant="text" height="1.5rem" width="80%" />
+          <Skeleton variant="text" height="1.5rem" width="60%" />
+        </div>
       </div>
     )
   }

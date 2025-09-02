@@ -62,6 +62,39 @@
   animation: spin 1s linear infinite;
 }
 
+/* Skeleton screen animations */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200px 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+.skeleton-text {
+  @apply skeleton bg-gray-700/50 rounded-md;
+}
+
+.skeleton-circle {
+  @apply skeleton bg-gray-700/50 rounded-full;
+}
+
+.skeleton-card {
+  @apply skeleton bg-gray-800/50 rounded-xl border border-gray-700/30;
+}
+
 @layer components {
   .glass-card {
     @apply backdrop-blur-xl bg-white/10 rounded-2xl border border-white/10
