@@ -104,6 +104,32 @@ function ProfilePage() {
     };
   }, [isRefreshing, pullDistance]);
 
+  // Lightweight live updates: refresh stats on focus/visibility and periodic interval
+  useEffect(() => {
+    const refreshIfAvailable = () => {
+      try {
+        (window as any).refreshMemberStats?.();
+      } catch {}
+    };
+
+    const onFocus = () => refreshIfAvailable();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshIfAvailable();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshIfAvailable();
+    }, 30000); // refresh every 30s while visible
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(id);
+    };
+  }, [memberId]);
+
 
   useEffect(() => {
     // Check URL parameters - support both member ID and family email
