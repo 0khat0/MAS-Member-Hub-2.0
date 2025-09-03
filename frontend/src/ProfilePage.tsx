@@ -25,110 +25,9 @@ function ProfilePage() {
   });
   const [showToolMenu, setShowToolMenu] = useState(false);
 
-  // Pull-to-refresh (smooth, in-app) for mobile
-  const [isPulling, setIsPulling] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showIndicator, setShowIndicator] = useState(false);
-  const [refreshVersion, setRefreshVersion] = useState(0);
 
-  useEffect(() => {
-    let startY = 0;
-    let monitoring = false;
-    const threshold = 70; // pixels pulled to trigger refresh
 
-    const onTouchStart = (e: TouchEvent) => {
-      if (isRefreshing) return;
-      if (window.scrollY <= 0) {
-        startY = e.touches[0].clientY;
-        monitoring = true;
-        setIsPulling(false);
-        setPullDistance(0);
-      } else {
-        monitoring = false;
-      }
-    };
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (!monitoring || isRefreshing) return;
-      const deltaY = e.touches[0].clientY - startY;
-      if (deltaY > 0) {
-        setIsPulling(true);
-        setPullDistance(Math.min(deltaY, 100));
-        setShowIndicator(true);
-      }
-    };
-
-    const onTouchEnd = () => {
-      if (!monitoring || isRefreshing) return;
-      if (pullDistance > threshold) {
-        setIsRefreshing(true);
-        setIsPulling(false);
-        setPullDistance(0);
-        setShowIndicator(true);
-        // Remount data components to re-fetch
-        setRefreshVersion((v) => v + 1);
-        // Hide spinner after a brief moment regardless of scroll position
-        window.setTimeout(() => {
-          setIsRefreshing(false);
-          setShowIndicator(false);
-        }, 900);
-      } else {
-        setIsPulling(false);
-        setPullDistance(0);
-        setShowIndicator(false);
-      }
-      monitoring = false;
-    };
-
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchmove', onTouchMove, { passive: true });
-    window.addEventListener('touchend', onTouchEnd);
-    window.addEventListener('touchcancel', onTouchEnd as any);
-    // Hide indicator on scroll if not actively refreshing
-    const onScroll = () => {
-      if (!isRefreshing) {
-        setIsPulling(false);
-        setPullDistance(0);
-        setShowIndicator(false);
-      }
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('touchstart', onTouchStart as any);
-      window.removeEventListener('touchmove', onTouchMove as any);
-      window.removeEventListener('touchend', onTouchEnd as any);
-      window.removeEventListener('touchcancel', onTouchEnd as any);
-      window.removeEventListener('scroll', onScroll as any);
-    };
-  }, [isRefreshing, pullDistance]);
-
-  // Lightweight live updates: refresh stats on focus/visibility and periodic interval
-  useEffect(() => {
-    const refreshIfAvailable = () => {
-      try {
-        (window as any).refreshMemberStats?.();
-      } catch {}
-    };
-
-    const onFocus = () => refreshIfAvailable();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshIfAvailable();
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refreshIfAvailable();
-    }, 30000); // refresh every 30s while visible
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.clearInterval(id);
-    };
-  }, [memberId]);
 
 
   useEffect(() => {
@@ -358,15 +257,7 @@ function ProfilePage() {
 
   return (
     <div className="relative">
-      {/* Pull-to-refresh indicator */}
-      <div
-        className="fixed left-0 right-0 top-0 z-40 flex justify-center pointer-events-none"
-        style={{ transform: `translateY(${isPulling ? Math.min(pullDistance, 60) : 0}px)`, transition: isPulling ? 'none' : 'transform 200ms ease' }}
-      >
-        {showIndicator && (
-          <div className="mt-2 w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin bg-transparent"></div>
-        )}
-      </div>
+
       {/* Tool menu button - top right corner */}
       <div className="fixed top-4 right-4 z-50">
         <button
@@ -448,7 +339,7 @@ function ProfilePage() {
         </div>
       )}
       {/* Key forces re-mount after pull-to-refresh to trigger fresh data fetch */}
-      <MemberStats key={`stats-${memberId}-${refreshVersion}`} memberId={memberId} />
+      <MemberStats key={`stats-${memberId}`} memberId={memberId} />
       
       {/* Add to Home Screen prompt */}
       <InstallPWA appName="MAS Hub" />

@@ -73,6 +73,65 @@ function MemberStats({ memberId }: Props) {
   // Declare selectedMember early to prevent initialization errors
   const selectedMember = familyMembers.find(m => m.id === selectedMemberId);
 
+  // Create refresh function that can be called manually
+  const refreshStats = async () => {
+    setIsLoading(true);
+    try {
+      // Add timeout to prevent infinite loading on mobile
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 15000); // 15 second timeout
+      });
+
+      const API_URL = getApiUrl();
+      const fetchPromise = fetch(`${API_URL}/member/${memberId}/stats`);
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError('Member not found. Please go back.');
+          clearMemberData();
+        } else {
+          setError('Failed to load profile. Please try again.');
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Member stats data:', data); // Debug log
+      console.log('Barcode from API:', data.barcode); // Debug log
+      console.log('Full stats object:', JSON.stringify(data, null, 2)); // Debug log
+      setStats(data);
+      setEditName(data.name || '');
+      setEditEmail(data.email || '');
+      if (data && data.check_in_dates && Array.isArray(data.check_in_dates)) {
+        const now = getEasternTime();
+        const monday = getMondayOfCurrentWeekEastern(now);
+        
+        const mondayString = getEasternDateString(monday);
+        const todayString = getEasternDateString(now);
+        
+        const weekCheckins = data.check_in_dates.filter((d: string) => {
+          const checkinDateString = d.split('T')[0]; // Get just the date part from ISO string
+          return checkinDateString >= mondayString && checkinDateString <= todayString;
+        }).length;
+        setWeeklyCheckins(weekCheckins);
+      } else {
+        setWeeklyCheckins(0);
+      }
+    } catch (error) {
+      console.error('Error fetching member stats:', error);
+      if (error instanceof Error && error.message === 'Request timeout') {
+        setError('Loading timeout - please check your connection and refresh');
+      } else {
+        setError('Network error. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  };
+
   // Immediate goal loading on component mount
   useEffect(() => {
     if (memberId && isValidUUID(memberId)) {
@@ -257,6 +316,10 @@ function MemberStats({ memberId }: Props) {
         setIsInitialLoad(false);
       }
     };
+
+    // Expose refresh function globally for other components to use
+    (window as any).refreshMemberStats = refreshStats;
+
     fetchStats();
   }, [memberId]);
 
@@ -1114,15 +1177,33 @@ function MemberStats({ memberId }: Props) {
 
         {/* Stats Section (card with 3 inner boxes) */}
         <div className="bg-[#181c23] border border-gray-700 rounded-2xl shadow-xl p-8 mb-4">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-extrabold text-white">
+                {isFamily ? `${selectedMember?.name || 'Member'}'s Stats` : 'My Stats'}
+              </h2>
             </div>
-            <h2 className="text-2xl font-extrabold text-white">
-              {isFamily ? `${selectedMember?.name || 'Member'}'s Stats` : 'My Stats'}
-            </h2>
+            <button
+              onClick={refreshStats}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 text-white rounded-lg transition-colors duration-200 text-sm"
+              title="Refresh stats"
+            >
+              <svg 
+                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
           </div>
           <div className="w-16 h-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-700 mb-6" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
