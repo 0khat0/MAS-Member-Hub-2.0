@@ -1,138 +1,147 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import AdminDashboard from './AdminDashboard'
-import MemberCheckin from './MemberCheckin'
-import ProfilePage from './ProfilePage'
-import DedicatedScanner from './DedicatedScanner'
-import MemberStats from './MemberStats'
-import QRCodeGenerator from './QRCodeGenerator'
-import BarcodeGenerator from './BarcodeGenerator'
-import AuthFlow from './AuthFlow'
-import HomeAuth from './HomeAuth'
-import ErrorBoundary from './ErrorBoundary'
-import { getSessionOptional } from './lib/session'
+import { Suspense, lazy, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import ErrorBoundary from "./ErrorBoundary";
+import './App.css'
+import MemberStats from "./MemberStats";
+import AuthFlow from "./AuthFlow";
+import ProfilePage from "./ProfilePage";
+import { getMemberId, reportIssue } from "./utils";
+import { apiFetch } from "./lib/session";
+
+// Lazy load components for better performance
+const MemberCheckin = lazy(() => import("./MemberCheckin"));
+const AdminDashboard = lazy(() => import("./AdminDashboard"));
+const DedicatedScanner = lazy(() => import("./DedicatedScanner"));
+
+// Loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"
+    />
+  </div>
+);
 
 // Footer component
 const Footer = () => (
   <footer className="text-gray-400 text-center py-3 px-4 mx-4 mb-4 mt-auto">
     <span>
-    Made by Omar | 
+    Built by Omar Khatib | 
       <button 
         onClick={reportIssue}
         className="text-gray-400 hover:text-white underline transition-colors duration-200"
       >
         Report Issues
-      </button>
+      </button> 
+      | v2.0
     </span>
   </footer>
-)
-
-// Report issue function
-const reportIssue = () => {
-  const issueText = `Issue Report - ${new Date().toISOString()}\n\nPlease describe the issue:\n\n`
-  const mailtoLink = `mailto:okhatib@torontomu.ca?subject=MAS Hub Issue Report&body=${encodeURIComponent(issueText)}`
-  window.open(mailtoLink)
-}
+);
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await getSessionOptional(5000)
-        setIsAuthenticated(!!session)
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        setIsAuthenticated(false)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkAuth()
-  }, [])
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
-      </div>
-    )
-  }
-
+    document.body.style.overflowX = 'hidden';
+    return () => { document.body.style.overflowX = ''; };
+  }, []);
   return (
     <ErrorBoundary>
       <Router>
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/admin/*" element={<AdminDashboard />} />
-              <Route path="/scanner" element={<DedicatedScanner />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/member-stats" element={<MemberStats />} />
-              <Route path="/qr-generator" element={<QRCodeGenerator />} />
-              <Route path="/barcode-generator" element={<BarcodeGenerator />} />
-              <Route 
-                path="/checkin" 
-                element={
-                  isAuthenticated ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <MemberCheckin />
-                    </motion.div>
-                  ) : (
-                    <Navigate to="/auth" replace />
-                  )
-                } 
-              />
-              <Route 
-                path="/auth" 
-                element={
-                  isAuthenticated ? (
-                    <Navigate to="/checkin" replace />
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <AuthFlow />
-                    </motion.div>
-                  )
-                } 
-              />
-              <Route 
-                path="/" 
-                element={
-                  isAuthenticated ? (
-                    <Navigate to="/checkin" replace />
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <HomeAuth />
-                    </motion.div>
-                  )
-                } 
-              />
-            </Routes>
-          </AnimatePresence>
-          <Footer />
-        </div>
+        <AppContent />
       </Router>
     </ErrorBoundary>
-  )
+  );
 }
 
-export default App
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  // Get validated memberId from localStorage for profile
+  const memberId = getMemberId();
+
+  // If user is logged in and tries to access home page, redirect to profile
+  useEffect(() => {
+    if (memberId && (location.pathname === "/home" || location.pathname === "/")) {
+      window.location.href = `/profile?id=${memberId}`;
+    }
+  }, [memberId, location.pathname]);
+
+  // No forced redirect to /auth; OTP is integrated on the home page UI
+
+  return (
+    <div className="bg-gray-900 text-white min-h-screen flex flex-col">
+      {/* Bottom navigation removed - users navigate via registration/sign-in flow */}
+
+      {/* Main content with page transitions */}
+      <main className="flex-1">
+        <Suspense fallback={<LoadingSpinner />}>
+          <ErrorBoundary>
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route path="/home" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <MemberCheckin />
+                  </motion.div>
+                } />
+                <Route path="/profile" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <ProfilePage />
+                  </motion.div>
+                } />
+
+                <Route path="/admin" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <AdminDashboard />
+                  </motion.div>
+                } />
+                <Route path="/admin/scanner" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <DedicatedScanner />
+                  </motion.div>
+                } />
+                <Route path="/" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <MemberCheckin />
+                  </motion.div>
+                } />
+              </Routes>
+            </AnimatePresence>
+          </ErrorBoundary>
+        </Suspense>
+      </main>
+      
+      {/* Footer */}
+      <Footer />
+    </div>
+  );
+}
+
+export default App;
