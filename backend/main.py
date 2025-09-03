@@ -1708,7 +1708,7 @@ async def update_member(request: Request, member_id: str, update: models.MemberU
 @app.delete("/member/{member_id}")
 @limiter.limit("5/minute")
 async def delete_member(request: Request, member_id: str, db: Session = Depends(get_db)):
-    """Soft delete a member (preserve check-ins) and clean up household if it's the last member"""
+    """Hard delete a member and clean up household if it's the last member"""
     # Validate UUID format
     if not is_valid_uuid(member_id):
         raise HTTPException(status_code=400, detail="Invalid member ID format")
@@ -1739,11 +1739,20 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
                household_id=str(household_id) if household_id else None)
     
     try:
-        # Soft delete the member (preserve check-ins for history)
-        member.deleted_at = datetime.now(pytz.UTC)
-        db.flush()
+        # Delete all associated check-ins first
+        checkins = db.query(models.Checkin).filter(
+            models.Checkin.member_id == member_uuid
+        ).all()
         
-        logger.info(f"Soft deleted member, preserved check-in history")
+        checkin_count = len(checkins)
+        for checkin in checkins:
+            db.delete(checkin)
+        
+        logger.info(f"Deleted {checkin_count} check-ins for member")
+        
+        # Now delete the member and flush so subsequent counts don't see it
+        db.delete(member)
+        db.flush()
         
         # Check if this was the last member in the household
         if household_id and household:
@@ -1777,7 +1786,7 @@ async def delete_member(request: Request, member_id: str, db: Session = Depends(
         
         return {
             "message": "Member deleted successfully",
-            "checkins_preserved": True,
+            "checkins_deleted": checkin_count,
             "household_deleted": household_id and remaining_members == 0 if 'remaining_members' in locals() else False
         }
         
@@ -1814,11 +1823,24 @@ async def delete_family(request: Request, email: str, db: Session = Depends(get_
     logger.info(f"Found {len(family_members)} family members to delete")
     
     try:
-        # Soft delete all family members (preserve check-ins for history)
+        # Delete all check-ins for all family members
+        checkin_count = 0
         for member in family_members:
-            member.deleted_at = datetime.now(pytz.UTC)
+            checkins = db.query(models.Checkin).filter(
+                models.Checkin.member_id == member.id
+            ).all()
+            
+            for checkin in checkins:
+                db.delete(checkin)
+                checkin_count += 1
         
-        logger.info(f"Soft deleted {len(family_members)} family members, preserved check-in history")
+        logger.info(f"Deleted {checkin_count} check-ins")
+        
+        # Delete all family members
+        for member in family_members:
+            db.delete(member)
+        
+        logger.info(f"Deleted {len(family_members)} family members")
         
         # Store household info before deletion for logging
         household_id = str(household.id)
@@ -1849,7 +1871,7 @@ async def delete_family(request: Request, email: str, db: Session = Depends(get_
             "message": f"Family account deleted successfully. Removed {len(family_members)} members and account number {household_code}.",
             "deleted_members": len(family_members),
             "deleted_household_code": household_code,
-            "checkins_preserved": True
+            "deleted_checkins": checkin_count
         }
         
     except Exception as e:
