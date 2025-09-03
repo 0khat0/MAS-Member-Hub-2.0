@@ -29,14 +29,27 @@ const LoadingSpinner = () => (
 const Footer = () => (
   <footer className="text-gray-400 text-center py-3 px-4 mx-4 mb-4 mt-auto">
     <span>
-    Built by Omar Khatib | 
+      <button
+        onClick={() => {
+          alert(
+            "MAS Member Hub — work in progress.\n\n" +
+            "Today: fast PWA for check‑ins.\n" +
+            "Next up: Leaderboard, Activities, UX improvements, and notifications.\n" +
+            "Goal: full‑fledged app by year‑end."
+          );
+        }}
+        className="text-gray-400 hover:text-white underline transition-colors duration-200"
+      >
+        Built by Omar Khatib
+      </button>
+      {" | "}
       <button 
         onClick={reportIssue}
         className="text-gray-400 hover:text-white underline transition-colors duration-200"
       >
         Report Issues
-      </button> 
-      | v2.0
+      </button>
+      {" | v2.0"}
     </span>
   </footer>
 );
