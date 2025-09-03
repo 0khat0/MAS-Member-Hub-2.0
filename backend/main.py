@@ -2396,17 +2396,32 @@ async def admin_get_household_by_code(request: Request, account_code: str, db: S
         models.Member.deleted_at.is_(None)
     ).order_by(models.Member.name).all()
     
-    # Check which members are already checked in today
-    today_start = datetime.now(pytz.UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    # Get Eastern time for AM/PM logic
+    eastern_tz = pytz.timezone('America/New_York')
+    now = datetime.now(eastern_tz)
+    today = now.date()
+    hour = now.hour
+    is_am = hour < 12
+    
+    # Define AM/PM period start/end
+    if is_am:
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
+    else:
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
+    
+    # Convert to UTC for DB query
+    period_start_utc = period_start.astimezone(pytz.UTC)
+    period_end_utc = period_end.astimezone(pytz.UTC)
     
     member_data = []
     for member in members:
-        # Check if member is already checked in today
+        # Check if member is already checked in this period
         existing_checkin = db.query(models.Checkin).filter(
             models.Checkin.member_id == member.id,
-            models.Checkin.timestamp >= today_start,
-            models.Checkin.timestamp < today_end
+            models.Checkin.timestamp >= period_start_utc,
+            models.Checkin.timestamp <= period_end_utc
         ).first()
         
         member_data.append({
