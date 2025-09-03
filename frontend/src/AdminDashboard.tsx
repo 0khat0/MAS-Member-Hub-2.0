@@ -68,6 +68,7 @@ function AdminDashboard() {
   
   // Refs for outside click detection
   const tableRef = useRef<HTMLDivElement>(null);
+  const refreshInFlightRef = useRef(false);
 
   // Define functions before useEffect
   
@@ -94,6 +95,8 @@ function AdminDashboard() {
 
   const fetchTodayCheckins = useCallback(async () => {
     try {
+      if (refreshInFlightRef.current) return;
+      refreshInFlightRef.current = true;
       setIsRefreshing(true);
       const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${API_URL}/admin/checkins/today`);
@@ -101,12 +104,10 @@ function AdminDashboard() {
       if (!response.ok) {
         if (response.status === 429) {
           console.warn('Rate limited. Please wait before refreshing again.');
-          setTodayCheckins([]);
-          return;
+          return; // keep old data
         }
         console.error('Error response:', response.status, response.statusText);
-        setTodayCheckins([]);
-        return;
+        return; // keep old data
       }
       
       const data = await response.json();
@@ -114,8 +115,7 @@ function AdminDashboard() {
       // Validate that data is an array
       if (!Array.isArray(data)) {
         console.error('Invalid data format received:', data);
-        setTodayCheckins([]);
-        return;
+        return; // keep old data
       }
       
       setTodayCheckins(data);
@@ -142,9 +142,10 @@ function AdminDashboard() {
       });
     } catch (error) {
       console.error('Error fetching today\'s check-ins:', error);
-      setTodayCheckins([]);
+      // keep old data
     } finally {
       setIsRefreshing(false);
+      refreshInFlightRef.current = false;
     }
   }, []);
 
@@ -566,14 +567,14 @@ function AdminDashboard() {
       await fetchMembers(); // Also refresh members list to include new family members
     };
     
-    // Auto-refresh check-ins every 2 seconds for near real-time updates
+    // Auto-refresh check-ins every 5 seconds for stability
     const refreshInterval = setInterval(async () => {
       try {
         await fetchTodayCheckins();
       } catch (error) {
         console.warn('Auto-refresh failed:', error);
       }
-    }, 2000); // 2 seconds
+    }, 5000);
     
 
     

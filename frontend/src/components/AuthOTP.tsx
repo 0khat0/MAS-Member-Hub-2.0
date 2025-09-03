@@ -209,6 +209,9 @@ export default function AuthOTP({ pendingId, emailMasked, rawEmail, onVerified, 
           <div className="text-center mb-4 sm:mb-6">
             <p className="text-gray-400 text-xs sm:text-sm">We sent a verification code to</p>
             <p className="text-blue-400 font-medium text-sm sm:text-base break-all">{emailMasked}</p>
+            <p className="mt-2 text-[11px] sm:text-xs text-gray-400">
+              Don’t see the code? Check your junk/spam folder.
+            </p>
           </div>
 
           {/* Small spinner while an action is in progress */}
