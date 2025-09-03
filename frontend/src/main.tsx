@@ -43,6 +43,12 @@ const updateSW = registerSW({
   onOfflineReady() {
     // Optional: could display a toast for offline readiness
   },
+  onRegistered(registration) {
+    // Force check for updates every time the app loads
+    if (registration) {
+      registration.update()
+    }
+  },
 })
 
 export function PWAUpdatePrompt() {
