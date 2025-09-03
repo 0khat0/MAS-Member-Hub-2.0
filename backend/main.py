@@ -1044,12 +1044,24 @@ async def get_today_checkins(request: Request, db: Session = Depends(get_db)):
         
         if len(all_family_members) > 1:
             # This is a family - always treat as family regardless of how many are checked in
+            # If everyone shares the exact same last name, show that instead of generic "Family"
+            def last_name(full_name: str) -> str:
+                parts = full_name.strip().split()
+                return parts[-1] if parts else ""
+
+            last_names = {last_name(m.name) for m in all_family_members if m.name}
+            display_name = "Family"
+            if len(last_names) == 1:
+                only_last = next(iter(last_names))
+                if only_last:
+                    display_name = f"{only_last} Family"
+
             # Use the earliest timestamp as the family timestamp to maintain consistency
             family_timestamp = min(group_data["timestamps"])
             result.append({
                 "checkin_id": group_data["checkin_ids"][0],  # Use first checkin ID as primary
                 "email": email,
-                "name": "Family",
+                "name": display_name,
                 "timestamp": family_timestamp.isoformat() + 'Z',
                 "is_family": True,
                 "family_members": group_data["members"],
