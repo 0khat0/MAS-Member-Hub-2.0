@@ -2174,21 +2174,40 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
         if not member:
             raise HTTPException(status_code=404, detail="Member not found with this barcode or email")
     
-    # Get timezone for Eastern
+    # Get Eastern time for AM/PM logic
     eastern_tz = pytz.timezone('America/New_York')
     now = datetime.now(eastern_tz)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = start_of_day + timedelta(days=1)
+    today = now.date()
+    hour = now.hour
+    is_am = hour < 12
     
-    # Check if this member already checked in today
+    # Define AM/PM period start/end
+    if is_am:
+        period_start = eastern_tz.localize(datetime.combine(today, time(0, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(11, 59, 59)))
+    else:
+        period_start = eastern_tz.localize(datetime.combine(today, time(12, 0, 0)))
+        period_end = eastern_tz.localize(datetime.combine(today, time(23, 59, 59)))
+    
+    # Convert to UTC for DB query
+    period_start_utc = period_start.astimezone(pytz.UTC)
+    period_end_utc = period_end.astimezone(pytz.UTC)
+    
+    # Check if already checked in this period
     existing_checkin = db.query(models.Checkin).filter(
         models.Checkin.member_id == member.id,
-        models.Checkin.timestamp >= start_of_day,
-        models.Checkin.timestamp < end_of_day
+        models.Checkin.timestamp >= period_start_utc,
+        models.Checkin.timestamp <= period_end_utc
     ).first()
     
     if existing_checkin:
-        raise HTTPException(status_code=409, detail=f"{member.name} has already checked in today")
+        return {
+            "message": f"{member.name} already checked in this {'AM' if is_am else 'PM'}.",
+            "member_id": str(member.id),
+            "timestamp": existing_checkin.timestamp,
+            "period": 'AM' if is_am else 'PM',
+            "already_checked_in": True
+        }
     
     # Check if this is a family (multiple members with same email)
     family_members = db.query(models.Member).filter(
@@ -2202,11 +2221,11 @@ async def checkin_by_barcode(request: Request, checkin_data: dict, db: Session =
         family_timestamp = datetime.now(pytz.UTC)  # Use the same timestamp for all family members
         
         for family_member in family_members:
-            # Check if this family member already checked in today
+            # Check if this family member already checked in this period
             existing_family_checkin = db.query(models.Checkin).filter(
                 models.Checkin.member_id == family_member.id,
-                models.Checkin.timestamp >= start_of_day,
-                models.Checkin.timestamp < end_of_day
+                models.Checkin.timestamp >= period_start_utc,
+                models.Checkin.timestamp <= period_end_utc
             ).first()
             
             if not existing_family_checkin:

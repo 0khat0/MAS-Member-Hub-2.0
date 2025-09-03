@@ -207,6 +207,9 @@ export default function InstallPWA({ appName = "MAS Hub", dismissDays = 7, class
               <strong>Add {appName} to your home screen</strong>
               <div style={{ opacity: 0.8, marginTop: 2, fontSize: 12 }}>
                 Quick access, full-screen, and faster loads.
+                <div style={{ marginTop: 4, fontSize: 11, color: '#10b981' }}>
+                  💡 Tip: Use your account number to login
+                </div>
               </div>
             </div>
           </div>
