@@ -1,5 +1,5 @@
 // Service Worker for MAS Academy Member Hub
-const CACHE_NAME = 'mas-hub-v1';
+const CACHE_NAME = 'mas-hub-v2';
 const urlsToCache = [
   '/',
   '/index.html',
