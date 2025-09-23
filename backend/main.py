@@ -508,7 +508,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
 
 
 @router.post("/auth/signin")
-def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_db)):
+def signin_auth(body: StartAuthBody, request: Request, response: Response, db: Session = Depends(get_db)):
     """Sign in with existing email - sends OTP for verification"""
     from sqlalchemy import select
     from models import Household
@@ -539,6 +539,27 @@ def signin_auth(body: StartAuthBody, request: Request, db: Session = Depends(get
         # Account exists but not verified - user should complete registration first
         raise HTTPException(status_code=400, detail="Account not verified. Please complete registration first.")
     
+    # If OTP is disabled, immediately set session and return full profile
+    if not otp_enabled():
+        token = _create_session_cookie(response, str(existing.id))
+        response.headers["Cache-Control"] = "no-store"
+        from sqlalchemy import select
+        members = db.execute(select(models.Member).where(models.Member.household_id == existing.id)).scalars().all()
+        return JSONResponse(
+            {
+                "ok": True,
+                "session_token": token,
+                "householdId": str(existing.id),
+                "ownerEmail": existing.owner_email,
+                "members": [
+                    {"id": str(m.id), "name": m.name}
+                    for m in members
+                ],
+                "householdCode": existing.household_code,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
     # Account exists and is verified - send OTP for sign in
     rl_key = f"{request.client.host}:{email}"
     if not rate_limit_ok(rl_key):
