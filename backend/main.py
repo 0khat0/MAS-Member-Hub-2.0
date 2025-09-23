@@ -214,6 +214,10 @@ SESSION_COOKIE = "mh_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
 
 
+def otp_enabled() -> bool:
+    return os.getenv("OTP_ENABLED", "true").lower() not in ("0", "false", "no", "off")
+
+
 def _create_session_cookie(response: Response, household_id: str):
     token = jwt.encode({"household_id": household_id, "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
     response.set_cookie(
@@ -412,7 +416,7 @@ class StartAuthAccountBody(BaseModel):
 
 
 @router.post("/auth/start")
-def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_db)):
+def start_auth(body: StartAuthBody, request: Request, response: Response, db: Session = Depends(get_db)):
     from sqlalchemy import select
     from models import Household
     from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
@@ -443,6 +447,45 @@ def start_auth(body: StartAuthBody, request: Request, db: Session = Depends(get_
     if not existing:
         db.add(household)
         db.flush()
+
+    # If OTP is disabled, auto-verify, set cookie, and return full profile now
+    if not otp_enabled():
+        household.email_verified_at = datetime.now(pytz.UTC)
+        household.email_verification_token_hash = None
+        household.email_verification_expires_at = None
+        db.add(household)
+        db.commit()
+
+        # Send welcome email with account number and QR code (best-effort)
+        try:
+            from emails.sender import send_welcome_email
+            send_welcome_email(
+                to=household.owner_email,
+                account_number=household.household_code,
+                household_id=str(household.id)
+            )
+        except Exception as e:
+            # Log error but don't fail the flow
+            logger.error(f"Failed to send welcome email: {e}")
+
+        token = _create_session_cookie(response, str(household.id))
+        # prevent caching; include a short-lived session_token echo for immediate use
+        response.headers["Cache-Control"] = "no-store"
+        members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+        return JSONResponse(
+            {
+                "ok": True,
+                "session_token": token,
+                "householdId": str(household.id),
+                "ownerEmail": household.owner_email,
+                "members": [
+                    {"id": str(m.id), "name": m.name}
+                    for m in members
+                ],
+                "householdCode": household.household_code,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
 
     # If there's a non-expired pending OTP, re-use it without sending another email
     if household.email_verification_token_hash and household.email_verification_expires_at and \

@@ -79,6 +79,12 @@ export default function AuthFlow() {
             setStep('otp') 
           }} 
           isSignIn={isSignIn}
+          onImmediate={async (data) => {
+            setMe(data);
+            await afterOtpVerified(() => {
+              setStep('done')
+            })
+          }}
         />
         <div className="mt-4 text-center">
           <button

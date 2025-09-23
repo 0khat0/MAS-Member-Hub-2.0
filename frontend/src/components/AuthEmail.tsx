@@ -6,9 +6,10 @@ type Props = {
   onPending: (pendingId: string, emailMasked: string, rawEmail: string) => void
   onSignIn?: () => void
   isSignIn: boolean
+  onImmediate?: (payload: any) => void
 }
 
-export default function AuthEmail({ onPending, onSignIn, isSignIn }: Props) {
+export default function AuthEmail({ onPending, onSignIn, isSignIn, onImmediate }: Props) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +35,13 @@ export default function AuthEmail({ onPending, onSignIn, isSignIn }: Props) {
         return
       }
       const data = await res.json()
+
+      // When OTP is disabled, backend returns full profile immediately
+      if (data && data.ok) {
+        onImmediate?.(data)
+        return
+      }
+
       onPending(data.pendingId, data.to, email.trim().toLowerCase())
     } catch (e: any) {
       setError('Failed to start. Please try again in a moment.')
