@@ -15,5 +15,15 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        { "type": "host", "value": "mas-member-hub.vercel.app" }
+      ],
+      "destination": "https://masmemberhub.ca/:1",
+      "statusCode": 308
+    }
   ]
 } 

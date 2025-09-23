@@ -7,17 +7,38 @@ import { getSessionOptional } from './lib/session'
 import { getHouseholdId, setHouseholdId, clearAppStorage } from './lib/storage'
 import Skeleton from './components/Skeleton'
 
-// Register custom service worker for PWA functionality
+// Canonical hosts that are allowed to register a service worker
+const CANONICAL_HOSTS = new Set(['masmemberhub.ca', 'www.masmemberhub.ca', 'localhost', '127.0.0.1'])
+const IS_CANONICAL_HOST = CANONICAL_HOSTS.has(location.hostname)
+
+// Register custom service worker for PWA functionality on canonical hosts only
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
+  if (IS_CANONICAL_HOST) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('SW registered: ', registration);
+        })
+        .catch((registrationError) => {
+          console.log('SW registration failed: ', registrationError);
+        });
+    });
+  } else {
+    // Non-canonical host: proactively unregister any existing SW and clear caches
+    window.addEventListener('load', async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map(r => r.unregister()))
+        if (caches) {
+          const keys = await caches.keys()
+          await Promise.all(keys.map(k => caches.delete(k)))
+        }
+        console.log('SW unregistered on non-canonical host:', location.hostname)
+      } catch (e) {
+        console.warn('Failed to unregister SW:', e)
+      }
+    })
+  }
 }
 
 // tiny SW debug helpers
@@ -34,22 +55,27 @@ async function unregisterSWIfNoSWParam() {
   }
 }
 
-// Register the service worker and show prompt when an update is available
-const updateSW = registerSW({
-  onNeedRefresh() {
-    const el = document.getElementById('pwa-update')
-    if (el) el.style.display = 'block'
-  },
-  onOfflineReady() {
-    // Optional: could display a toast for offline readiness
-  },
-  onRegistered(registration) {
-    // Force check for updates every time the app loads
-    if (registration) {
-      registration.update()
-    }
-  },
-})
+// Register the service worker and show prompt when an update is available (canonical hosts only)
+let updateSW: (reloadPage?: boolean) => Promise<void>
+if (IS_CANONICAL_HOST) {
+  updateSW = registerSW({
+    onNeedRefresh() {
+      const el = document.getElementById('pwa-update')
+      if (el) el.style.display = 'block'
+    },
+    onOfflineReady() {
+      // Optional: could display a toast for offline readiness
+    },
+    onRegistered(registration) {
+      // Force check for updates every time the app loads
+      if (registration) {
+        registration.update()
+      }
+    },
+  })
+} else {
+  updateSW = async () => {}
+}
 
 export function PWAUpdatePrompt() {
   return (
