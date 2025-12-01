@@ -12,6 +12,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://mas-member-hub-20-production.up.railway.app/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
