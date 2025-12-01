@@ -75,10 +75,24 @@ export default function HomeAuth() {
         // Login with email
         const res = await apiFetch('/v1/auth/start', {
           method: 'POST',
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email, name: name.trim() })
         })
         if (!res.ok) throw new Error('failed')
         const data = await res.json()
+
+        // Immediate login path when OTP disabled
+        if (data && data.ok) {
+          const firstMemberId = Array.isArray(data.members) && data.members.length > 0 ? data.members[0]?.id : null
+          if (firstMemberId) {
+            try { localStorage.setItem('member_id', firstMemberId) } catch {}
+          }
+          await afterOtpVerified(() => {
+            window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile'
+          })
+          return
+        }
+
+        // Fallback to OTP flow
         setPendingId(data.pendingId)
         setEmailMasked(data.to)
       }
@@ -172,9 +186,10 @@ export default function HomeAuth() {
           <>
             <input
               type="text"
-              placeholder="Member name (optional)"
+              placeholder="Full name"
               value={name}
               onChange={(e) => handleNameInputChange(e, setName)}
+              required
               className="w-full rounded-lg px-4 py-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
             />
             <input
