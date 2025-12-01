@@ -77,6 +77,32 @@ export default function HomeAuth() {
           method: 'POST',
           body: JSON.stringify({ email, name: name.trim() })
         })
+
+        // If the account already exists, automatically switch to sign-in
+        if (res.status === 409) {
+          const signRes = await apiFetch('/v1/auth/signin', {
+            method: 'POST',
+            body: JSON.stringify({ email })
+          })
+          if (!signRes.ok) throw new Error('failed')
+          const signData = await signRes.json()
+          // Immediate login path for sign-in when OTP disabled
+          if (signData && signData.ok) {
+            const firstMemberId = Array.isArray(signData.members) && signData.members.length > 0 ? signData.members[0]?.id : null
+            if (firstMemberId) {
+              try { localStorage.setItem('member_id', firstMemberId) } catch {}
+            }
+            await afterOtpVerified(() => {
+              window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile'
+            })
+            return
+          }
+          // Otherwise, go to OTP for sign-in
+          setPendingId(signData.pendingId)
+          setEmailMasked(signData.to)
+          return
+        }
+
         if (!res.ok) throw new Error('failed')
         const data = await res.json()
 
