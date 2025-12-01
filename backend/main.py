@@ -410,6 +410,7 @@ def reconcile_session(request: Request, db: Session = Depends(get_db)):
 
 class StartAuthBody(BaseModel):
     email: EmailStr
+    name: Optional[str] = None
 
 class StartAuthAccountBody(BaseModel):
     accountNumber: str
@@ -455,6 +456,38 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         household.email_verification_expires_at = None
         db.add(household)
         db.commit()
+
+        # Create first member if none exists
+        try:
+            from models import generate_barcode
+            # Check existing members
+            existing_members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+            if not existing_members:
+                # Determine member name
+                member_name = (body.name or "").strip() or "Primary"
+                # Generate unique barcode (best-effort)
+                barcode = None
+                try:
+                    for _ in range(10):
+                        candidate = generate_barcode()
+                        exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
+                        if not exists:
+                            barcode = candidate
+                            break
+                except Exception:
+                    barcode = None
+                # Create member
+                m = models.Member(
+                    email=household.owner_email,
+                    name=member_name,
+                    barcode=barcode,
+                    household_id=household.id,
+                )
+                db.add(m)
+                db.commit()
+        except Exception as e:
+            # Log error but continue; user can add member later
+            logger.error("failed_to_create_initial_member", error=str(e))
 
         # Send welcome email with account number and QR code (best-effort)
         try:

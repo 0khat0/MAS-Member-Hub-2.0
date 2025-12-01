@@ -11,6 +11,7 @@ type Props = {
 
 export default function AuthEmail({ onPending, onSignIn, isSignIn, onImmediate }: Props) {
   const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,7 +23,7 @@ export default function AuthEmail({ onPending, onSignIn, isSignIn, onImmediate }
       const endpoint = isSignIn ? '/v1/auth/signin' : '/v1/auth/start'
       const res = await apiFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ email })
+        body: JSON.stringify(isSignIn ? { email } : { email, name })
       })
       if (!res.ok) {
         if (res.status === 409) {
@@ -52,6 +53,16 @@ export default function AuthEmail({ onPending, onSignIn, isSignIn, onImmediate }
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {!isSignIn && (
+        <input
+          type="text"
+          placeholder="Full name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="w-full rounded px-3 py-2 text-black"
+        />
+      )}
       <input
         type="email"
         placeholder="your@email.com"
@@ -88,7 +99,7 @@ export default function AuthEmail({ onPending, onSignIn, isSignIn, onImmediate }
           ? 'bg-blue-600 hover:bg-blue-700' 
           : 'bg-red-600 hover:bg-red-700'
       }`}>
-        {loading ? 'Sending…' : (isSignIn ? 'Send sign-in code' : 'Send verification code')}
+        {loading ? (isSignIn ? 'Signing in…' : 'Creating…') : (isSignIn ? 'Sign in' : 'Create account')}
       </button>
     </form>
   )
