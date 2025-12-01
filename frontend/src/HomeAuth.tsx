@@ -72,41 +72,16 @@ export default function HomeAuth() {
         setPendingId(data.pendingId)
         setEmailMasked(data.to)
       } else {
-        // Login with email
+        // Create account with email and name
         const res = await apiFetch('/v1/auth/start', {
           method: 'POST',
           body: JSON.stringify({ email, name: name.trim() })
         })
 
-        // If the account already exists, automatically switch to sign-in
-        if (res.status === 409) {
-          const signRes = await apiFetch('/v1/auth/signin', {
-            method: 'POST',
-            body: JSON.stringify({ email })
-          })
-          if (!signRes.ok) throw new Error('failed')
-          const signData = await signRes.json()
-          // Immediate login path for sign-in when OTP disabled
-          if (signData && signData.ok) {
-            const firstMemberId = Array.isArray(signData.members) && signData.members.length > 0 ? signData.members[0]?.id : null
-            if (firstMemberId) {
-              try { localStorage.setItem('member_id', firstMemberId) } catch {}
-            }
-            await afterOtpVerified(() => {
-              window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile'
-            })
-            return
-          }
-          // Otherwise, go to OTP for sign-in
-          setPendingId(signData.pendingId)
-          setEmailMasked(signData.to)
-          return
-        }
-
         if (!res.ok) throw new Error('failed')
         const data = await res.json()
 
-        // Immediate login path when OTP disabled
+        // Immediate login - backend always returns ok:true now
         if (data && data.ok) {
           const firstMemberId = Array.isArray(data.members) && data.members.length > 0 ? data.members[0]?.id : null
           if (firstMemberId) {
@@ -118,9 +93,8 @@ export default function HomeAuth() {
           return
         }
 
-        // Fallback to OTP flow
-        setPendingId(data.pendingId)
-        setEmailMasked(data.to)
+        // Should never reach here, but fallback just in case
+        throw new Error('Unexpected response format')
       }
     } catch {
       setError('Failed to start. Please try again in a moment.')
