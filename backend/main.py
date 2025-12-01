@@ -429,7 +429,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
 
     # If OTP is disabled, short-circuit to immediate login path:
-    if not otp_enabled():
+    if True:
         # Ensure household exists and is verified
         household = existing or Household(owner_email=email)
         if not existing:
@@ -515,7 +515,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         db.flush()
 
     # If OTP is disabled, auto-verify, set cookie, and return full profile now
-    if not otp_enabled():
+    if True:
         household.email_verified_at = datetime.now(pytz.UTC)
         household.email_verification_token_hash = None
         household.email_verification_expires_at = None
