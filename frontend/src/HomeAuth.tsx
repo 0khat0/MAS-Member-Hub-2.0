@@ -78,8 +78,14 @@ export default function HomeAuth() {
           body: JSON.stringify({ email, name: name.trim() })
         })
 
-        if (!res.ok) throw new Error('failed')
+        if (!res.ok) {
+          const errorText = await res.text()
+          console.error('Create account failed:', res.status, errorText)
+          throw new Error(`Failed: ${res.status}`)
+        }
+        
         const data = await res.json()
+        console.log('Create account response:', data)
 
         // Immediate login - backend always returns ok:true now
         if (data && data.ok) {
@@ -87,13 +93,13 @@ export default function HomeAuth() {
           if (firstMemberId) {
             try { localStorage.setItem('member_id', firstMemberId) } catch {}
           }
-          await afterOtpVerified(() => {
-            window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile'
-          })
+          // Redirect immediately - cookie should be set by backend
+          window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile'
           return
         }
 
         // Should never reach here, but fallback just in case
+        console.error('Unexpected response format:', data)
         throw new Error('Unexpected response format')
       }
     } catch {

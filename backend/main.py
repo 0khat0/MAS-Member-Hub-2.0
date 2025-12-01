@@ -220,12 +220,13 @@ def otp_enabled() -> bool:
 
 def _create_session_cookie(response: Response, household_id: str):
     token = jwt.encode({"household_id": household_id, "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
+    is_prod = os.getenv("ENVIRONMENT") == "production"
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,
         httponly=True,
-        secure=os.getenv("ENVIRONMENT") == "production",  # required for iOS PWAs over HTTPS
-        samesite=("none" if os.getenv("ENVIRONMENT") == "production" else "lax"),  # cross-origin + iOS
+        secure=is_prod,  # required for iOS PWAs over HTTPS
+        samesite="lax",  # Works for same-origin (proxied) requests
         path="/",
         max_age=SESSION_MAX_AGE,
     )
@@ -485,9 +486,11 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         ],
         "householdCode": household.household_code,
     }
+    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members))
     resp = JSONResponse(payload)
     resp.headers["Cache-Control"] = "no-store"
     _create_session_cookie(resp, str(household.id))
+    logger.info("Session cookie set", household_id=str(household.id))
     return resp
 
 
