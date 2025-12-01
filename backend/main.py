@@ -423,6 +423,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
     from models import Household
 
     email = str(body.email).strip().lower()
+    logger.info("Auth start request received", email=email, name_received=body.name, name_type=type(body.name).__name__)
 
     # Look up existing household for this email
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
@@ -443,17 +444,22 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
     # Create first member with provided name if none exists
     existing_members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
     if not existing_members:
-        member_name = (body.name or "").strip()
+        member_name = (body.name or "").strip() if body.name else ""
+        logger.info("Attempting to create member", household_id=str(household.id), member_name=member_name, name_provided=bool(body.name))
         if member_name:
             try:
-                # Generate unique barcode
+                # Generate unique barcode (best-effort)
                 barcode = None
-                for _ in range(10):
-                    candidate = generate_barcode()
-                    exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
-                    if not exists:
-                        barcode = candidate
-                        break
+                try:
+                    for _ in range(10):
+                        candidate = generate_barcode()
+                        exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
+                        if not exists:
+                            barcode = candidate
+                            break
+                except Exception as e:
+                    logger.warning(f"Barcode generation failed, continuing without barcode: {e}")
+                    barcode = None
                 
                 m = models.Member(
                     email=household.owner_email,
@@ -462,11 +468,28 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
                     household_id=household.id,
                 )
                 db.add(m)
+                db.flush()  # Flush first to get the ID
                 db.commit()
-                logger.info("Created initial member", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
+                logger.info("Successfully created initial member", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
             except Exception as e:
-                logger.error(f"Failed to create initial member: {e}", exc_info=True)
-                # Continue anyway - member can be added later
+                logger.error(f"CRITICAL: Failed to create initial member: {e}", exc_info=True)
+                db.rollback()  # Rollback the failed transaction
+                # Create member without barcode as fallback
+                try:
+                    m = models.Member(
+                        email=household.owner_email,
+                        name=member_name,
+                        barcode=None,  # No barcode
+                        household_id=household.id,
+                    )
+                    db.add(m)
+                    db.commit()
+                    logger.info("Created member without barcode as fallback", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
+                except Exception as e2:
+                    logger.error(f"CRITICAL: Even fallback member creation failed: {e2}", exc_info=True)
+                    db.rollback()
+        else:
+            logger.warning("No member name provided, skipping member creation", household_id=str(household.id))
 
     # Best-effort welcome email
     try:
@@ -480,7 +503,12 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         logger.error(f"Failed to send welcome email: {e}")
 
     # Return profile with session cookie - ALWAYS include all fields
+    # Refresh household to get latest state
+    db.refresh(household)
+    # Query members fresh after all commits
     members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+    logger.info("Final member query", household_id=str(household.id), member_count=len(members), member_names=[m.name for m in members])
+    
     token = jwt.encode({"household_id": str(household.id), "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
     payload = {
         "ok": True,
@@ -493,7 +521,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         ],
         "householdCode": household.household_code,
     }
-    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members), has_members=len(members) > 0)
+    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members), has_members=len(members) > 0, payload_members=payload["members"])
     resp = JSONResponse(payload)
     resp.headers["Cache-Control"] = "no-store"
     _create_session_cookie(resp, str(household.id))
