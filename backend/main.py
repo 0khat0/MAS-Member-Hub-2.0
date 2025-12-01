@@ -445,23 +445,28 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
     if not existing_members:
         member_name = (body.name or "").strip()
         if member_name:
-            # Generate unique barcode
-            barcode = None
-            for _ in range(10):
-                candidate = generate_barcode()
-                exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
-                if not exists:
-                    barcode = candidate
-                    break
-            
-            m = models.Member(
-                email=household.owner_email,
-                name=member_name,
-                barcode=barcode,
-                household_id=household.id,
-            )
-            db.add(m)
-            db.commit()
+            try:
+                # Generate unique barcode
+                barcode = None
+                for _ in range(10):
+                    candidate = generate_barcode()
+                    exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
+                    if not exists:
+                        barcode = candidate
+                        break
+                
+                m = models.Member(
+                    email=household.owner_email,
+                    name=member_name,
+                    barcode=barcode,
+                    household_id=household.id,
+                )
+                db.add(m)
+                db.commit()
+                logger.info("Created initial member", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
+            except Exception as e:
+                logger.error(f"Failed to create initial member: {e}", exc_info=True)
+                # Continue anyway - member can be added later
 
     # Best-effort welcome email
     try:
@@ -474,10 +479,12 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
     except Exception as e:
         logger.error(f"Failed to send welcome email: {e}")
 
-    # Return profile with session cookie
+    # Return profile with session cookie - ALWAYS include all fields
     members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+    token = jwt.encode({"household_id": str(household.id), "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
     payload = {
         "ok": True,
+        "session_token": token,
         "householdId": str(household.id),
         "ownerEmail": household.owner_email,
         "members": [
@@ -486,7 +493,7 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
         ],
         "householdCode": household.household_code,
     }
-    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members))
+    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members), has_members=len(members) > 0)
     resp = JSONResponse(payload)
     resp.headers["Cache-Control"] = "no-store"
     _create_session_cookie(resp, str(household.id))
