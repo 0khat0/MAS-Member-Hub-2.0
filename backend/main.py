@@ -501,24 +501,22 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
             # Log error but don't fail the flow
             logger.error(f"Failed to send welcome email: {e}")
 
-        token = _create_session_cookie(response, str(household.id))
-        # prevent caching; include a short-lived session_token echo for immediate use
-        response.headers["Cache-Control"] = "no-store"
         members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
-        return JSONResponse(
-            {
-                "ok": True,
-                "session_token": token,
-                "householdId": str(household.id),
-                "ownerEmail": household.owner_email,
-                "members": [
-                    {"id": str(m.id), "name": m.name}
-                    for m in members
-                ],
-                "householdCode": household.household_code,
-            },
-            headers={"Cache-Control": "no-store"},
-        )
+        payload = {
+            "ok": True,
+            "householdId": str(household.id),
+            "ownerEmail": household.owner_email,
+            "members": [
+                {"id": str(m.id), "name": m.name}
+                for m in members
+            ],
+            "householdCode": household.household_code,
+        }
+        resp = JSONResponse(payload)
+        resp.headers["Cache-Control"] = "no-store"
+        # Attach session cookie to the actual returned response
+        _create_session_cookie(resp, str(household.id))
+        return resp
 
     # If there's a non-expired pending OTP, re-use it without sending another email
     if household.email_verification_token_hash and household.email_verification_expires_at and \
@@ -574,24 +572,22 @@ def signin_auth(body: StartAuthBody, request: Request, response: Response, db: S
     
     # If OTP is disabled, immediately set session and return full profile
     if not otp_enabled():
-        token = _create_session_cookie(response, str(existing.id))
-        response.headers["Cache-Control"] = "no-store"
         from sqlalchemy import select
         members = db.execute(select(models.Member).where(models.Member.household_id == existing.id)).scalars().all()
-        return JSONResponse(
-            {
-                "ok": True,
-                "session_token": token,
-                "householdId": str(existing.id),
-                "ownerEmail": existing.owner_email,
-                "members": [
-                    {"id": str(m.id), "name": m.name}
-                    for m in members
-                ],
-                "householdCode": existing.household_code,
-            },
-            headers={"Cache-Control": "no-store"},
-        )
+        payload = {
+            "ok": True,
+            "householdId": str(existing.id),
+            "ownerEmail": existing.owner_email,
+            "members": [
+                {"id": str(m.id), "name": m.name}
+                for m in members
+            ],
+            "householdCode": existing.household_code,
+        }
+        resp = JSONResponse(payload)
+        resp.headers["Cache-Control"] = "no-store"
+        _create_session_cookie(resp, str(existing.id))
+        return resp
 
     # Account exists and is verified - send OTP for sign in
     rl_key = f"{request.client.host}:{email}"
