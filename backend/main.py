@@ -427,10 +427,75 @@ def start_auth(body: StartAuthBody, request: Request, response: Response, db: Se
 
     # Look up existing household for this email
     existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-    if existing and existing.email_verified_at:
-        # Verified account must sign in
-        logger.info("Rejecting registration - verified account exists", email=email)
-        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in instead.")
+
+    # If OTP is disabled, short-circuit to immediate login path:
+    if not otp_enabled():
+        # Ensure household exists and is verified
+        household = existing or Household(owner_email=email)
+        if not existing:
+            db.add(household)
+            db.flush()
+        household.email_verified_at = datetime.now(pytz.UTC)
+        household.email_verification_token_hash = None
+        household.email_verification_expires_at = None
+        db.add(household)
+        db.commit()
+
+        # Create first member with provided name if none exists
+        try:
+            existing_members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+            if not existing_members:
+                member_name = (body.name or "").strip()
+                if member_name:
+                    # best-effort barcode
+                    barcode = None
+                    try:
+                        for _ in range(10):
+                            candidate = generate_barcode()
+                            exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
+                            if not exists:
+                                barcode = candidate
+                                break
+                    except Exception:
+                        barcode = None
+                    m = models.Member(
+                        email=household.owner_email,
+                        name=member_name,
+                        barcode=barcode,
+                        household_id=household.id,
+                    )
+                    db.add(m)
+                    db.commit()
+        except Exception as e:
+            logger.error("failed_to_create_initial_member", error=str(e))
+
+        # Best-effort welcome email
+        try:
+            from emails.sender import send_welcome_email
+            send_welcome_email(
+                to=household.owner_email,
+                account_number=household.household_code,
+                household_id=str(household.id)
+            )
+        except Exception as e:
+            logger.error(f"Failed to send welcome email: {e}")
+
+        # Build profile payload and attach session cookie on response object
+        members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+        payload = {
+            "ok": True,
+            "householdId": str(household.id),
+            "ownerEmail": household.owner_email,
+            "members": [
+                {"id": str(m.id), "name": m.name}
+                for m in members
+            ],
+            "householdCode": household.household_code,
+        }
+        resp = JSONResponse(payload)
+        resp.headers["Cache-Control"] = "no-store"
+        _create_session_cookie(resp, str(household.id))
+        return resp
 
     # Rate limit by IP + email. If we're rate limited but a valid pending OTP exists,
     # return the existing pendingId to allow the client to proceed without sending another email.
