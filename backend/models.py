@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 import pytz
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index, Text
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy import event
@@ -16,9 +16,6 @@ class Household(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_email = Column(String, nullable=False, index=True)
-    email_verified_at = Column(DateTime(timezone=True), nullable=True)
-    email_verification_token_hash = Column(Text, nullable=True)
-    email_verification_expires_at = Column(DateTime(timezone=True), nullable=True)
     household_code = Column(String(6), nullable=False, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(pytz.UTC), index=True)
 

@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./ErrorBoundary";
 import './App.css'
 import MemberStats from "./MemberStats";
-import AuthFlow from "./AuthFlow";
 import ProfilePage from "./ProfilePage";
 import { getMemberId, reportIssue } from "./utils";
 import { apiFetch } from "./lib/session";

@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "./assets/mas-logo.png";
 import { isValidUUID, getApiUrl, clearMemberData, setMemberId, getEasternTime, reconcileSession } from "./utils";
-import AuthOTP from "./components/AuthOTP";
-import { apiFetch, bootstrapSession } from './lib/session'
-import { afterOtpVerified } from './lib/afterOtpVerified'
+import { apiFetch } from './lib/session'
 import { handleNameInputChange } from './utils/nameUtils';
 
 function getDailyMuayThaiMessage() {
@@ -40,6 +38,8 @@ function MemberCheckin() {
   const [message, setMessage] = useState<string>("");
   const [formEmail, setFormEmail] = useState("");
   const [formName, setFormName] = useState("");
+  const [createdAccountCode, setCreatedAccountCode] = useState<string | null>(null);
+  const [createdProfileUrl, setCreatedProfileUrl] = useState<string | null>(null);
   const [checkinByName, setCheckinByName] = useState(false);
   const [familyNames, setFamilyNames] = useState<string[]>([]);
   const [isFamily, setIsFamily] = useState(false);
@@ -49,18 +49,6 @@ function MemberCheckin() {
   const [notCheckedInMembers, setNotCheckedInMembers] = useState<string[]>([]);
   const [checkinStatusLoading, setCheckinStatusLoading] = useState(false);
   const [showLoginInfo, setShowLoginInfo] = useState(false);
-  // OTP state
-  const [otpPendingId, setOtpPendingId] = useState<string | null>(null);
-  const [otpEmailMasked, setOtpEmailMasked] = useState('');
-  const [otpEmail, setOtpEmail] = useState('');
-  
-  // Form state persistence for OTP cancellation
-  const [formState, setFormState] = useState({
-    email: '',
-    name: '',
-    familyNames: [] as string[],
-    isFamily: false
-  });
 
   // Unified error handling function
   const handleError = (errorMessage: string) => {
@@ -87,23 +75,6 @@ function MemberCheckin() {
   const addFamilyMember = () => setFamilyNames(names => [...names, ""]);
   const removeFamilyMember = (idx: number) => setFamilyNames(names => names.filter((_, i) => i !== idx));
 
-  // Save form state before starting OTP
-  const saveFormState = () => {
-    setFormState({
-      email: formEmail,
-      name: formName,
-      familyNames: [...familyNames],
-      isFamily
-    });
-  };
-
-  // Restore form state after OTP cancellation
-  const restoreFormState = () => {
-    setFormEmail(formState.email);
-    setFormName(formState.name);
-    setFamilyNames([...formState.familyNames]);
-    setIsFamily(formState.isFamily);
-  };
 
   // On load, check if user is already logged in
   useEffect(() => {
@@ -158,31 +129,32 @@ function MemberCheckin() {
       // Simulate the sign-in process with the stored account number
       setTimeout(async () => {
         try {
-          const response = await fetch(`${getApiUrl()}/api/verify-account`, {
+          const response = await apiFetch('/v1/auth/login-account', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ account_number: savedAccountNumber })
+            body: JSON.stringify({ accountNumber: savedAccountNumber.trim() })
           });
 
           if (response.ok) {
             const data = await response.json();
             
             // Store the session data
-            localStorage.setItem('member_email', data.email);
-            localStorage.setItem('member_id', data.member_id);
+            if (data?.ownerEmail) localStorage.setItem('member_email', data.ownerEmail);
+            if (data?.householdCode) localStorage.setItem('household_code', data.householdCode);
+            const firstMemberId = Array.isArray(data?.members) && data.members.length > 0 ? data.members[0]?.id : null;
+            if (firstMemberId) localStorage.setItem('member_id', firstMemberId);
             
-            if (data.family_members && data.family_members.length > 1) {
-              localStorage.setItem('family_members', JSON.stringify(data.family_members));
+            if (Array.isArray(data?.members) && data.members.length > 1) {
+              localStorage.setItem('family_members', JSON.stringify(data.members.map((m: any) => m.name)));
               setStatus("success");
               setMessage("Welcome back! Redirecting to your family profile...");
               setTimeout(() => {
-                window.location.href = `/profile?email=${encodeURIComponent(data.email)}`;
+                window.location.href = `/profile?email=${encodeURIComponent(data.ownerEmail)}`;
               }, 1500);
             } else {
               setStatus("success");
               setMessage("Welcome back! Redirecting to your profile...");
               setTimeout(() => {
-                window.location.href = `/profile?id=${data.member_id}`;
+                window.location.href = firstMemberId ? `/profile?id=${firstMemberId}` : '/profile';
               }, 1500);
             }
             return;
@@ -192,6 +164,7 @@ function MemberCheckin() {
         }
         
         // If auto sign-in fails, fall back to manual entry
+        localStorage.removeItem('household_code');
         setStatus("register");
         setMessage("");
       }, 1000);
@@ -238,140 +211,6 @@ function MemberCheckin() {
       <div className="flex flex-col items-center justify-center w-full min-h-screen px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
 
-        {/* OTP modal only after Create account */}
-        {otpPendingId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-sm rounded-lg bg-gray-900 border border-gray-700 p-5 text-white shadow-xl">
-              <h2 className="sr-only">Enter the code</h2>
-              <AuthOTP
-                pendingId={otpPendingId}
-                emailMasked={otpEmailMasked}
-                rawEmail={otpEmail}
-                onBack={() => {
-                  setOtpPendingId(null)
-                  restoreFormState()
-                  setStatus('register')
-                }}
-                onCancel={() => {
-                  setOtpPendingId(null)
-                  restoreFormState()
-                  setStatus('register')
-                }}
-                onVerified={async (verifyPayload: any) => {
-                  const sessionToken: string | undefined = verifyPayload?.session_token
-                  try {
-                    console.log('OTP verified, starting member creation...')
-                    // Brief pause so iOS can persist the cookie
-                    await new Promise(resolve => setTimeout(resolve, 600))
-
-                    const names = (isFamily ? [formName, ...familyNames] : [formName])
-                      .map(n => (n || '').trim())
-                      .filter(n => n.length > 0)
-
-                    let firstId: string | null = null
-
-                    // Attempt member creation using cookie first
-                    for (const name of names) {
-                      try {
-                        const res = await apiFetch('/v1/households/members', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: name.trim() })
-                        })
-                        if (res.ok) {
-                          const m = await res.json()
-                          if (!firstId) firstId = m?.id ?? null
-                        }
-                      } catch {}
-                    }
-
-                    // If no member created and we have a session token, try again with Bearer token (cookie race workaround)
-                    if (!firstId && sessionToken) {
-                      for (const name of names) {
-                        try {
-                          const res = await apiFetch('/v1/households/members', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                            body: JSON.stringify({ name: name.trim() })
-                          })
-                          if (res.ok) {
-                            const m = await res.json()
-                            if (!firstId) firstId = m?.id ?? null
-                          }
-                        } catch {}
-                      }
-                    }
-
-                    // Persist basic context
-                    if (otpEmail) localStorage.setItem('member_email', otpEmail)
-                    // Store household code for account number display
-                    if (verifyPayload?.householdCode) {
-                      localStorage.setItem('household_code', verifyPayload.householdCode)
-                    }
-                    // Add this line to mark recent authentication
-                    localStorage.setItem('last_auth_time', Date.now().toString())
-                    if (!firstId) {
-                      // Try to read household members (cookie first, then token)
-                      let me = await apiFetch('/v1/households/me').catch(() => null)
-                      if ((!me || !me.ok) && sessionToken) {
-                        me = await apiFetch('/v1/households/me', { headers: { 'Authorization': `Bearer ${sessionToken}` } }).catch(() => null) as any
-                      }
-                      if (me && me.ok) {
-                        const data = await me.json()
-                        firstId = data?.members?.[0]?.id ?? null
-                      }
-                    }
-                    if (firstId) localStorage.setItem('member_id', firstId)
-
-                    // Confirm session via probe with small retries
-                    let sessionOk = false
-                    for (let i = 0; i < 3 && !sessionOk; i++) {
-                      try {
-                        let probe = await apiFetch('/v1/auth/session')
-                        if (!probe.ok && sessionToken) {
-                          probe = await apiFetch('/v1/auth/session', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
-                        }
-                        sessionOk = probe.ok
-                        if (!sessionOk) await new Promise(r => setTimeout(r, 300 * (i + 1)))
-                      } catch {
-                        await new Promise(r => setTimeout(r, 300 * (i + 1)))
-                      }
-                    }
-
-                    // Reconcile session to prevent cross-contamination
-                    try {
-                      const reconciled = await reconcileSession()
-                      if (reconciled) {
-                        console.log('Session reconciled:', reconciled)
-                      }
-                    } catch (error) {
-                      console.warn('Session reconciliation failed:', error)
-                    }
-
-                    if (!firstId) {
-                      // Show error instead of infinite spinner
-                      setOtpPendingId(null)
-                      setStatus('error')
-                      setMessage('Could not create your profile. Please try again or reload the app.')
-                      return
-                    }
-
-                    const profileUrl = firstId ? `/profile?id=${firstId}` : `/profile?email=${encodeURIComponent(otpEmail)}`
-                    // Use afterOtpVerified to handle iOS PWA cookie race condition
-                    await afterOtpVerified(() => {
-                      window.location.replace(profileUrl)
-                    })
-                  } catch (error) {
-                    console.error('OTP verification error:', error)
-                    setOtpPendingId(null)
-                    setStatus('error')
-                    setMessage('We could not complete registration. Please try again or reload the app.')
-                  }
-                }}
-              />
-            </div>
-          </div>
-        )}
         <motion.div
           className="flex flex-row items-center justify-center w-full mb-4 gap-6"
           initial={{ opacity: 0, y: -20 }}
@@ -395,6 +234,69 @@ function MemberCheckin() {
             <div className="h-2 rounded-full animated-accent-bar shadow-md mt-2 w-full" />
           </div>
         </motion.div>
+        {/* Success State (show account code after signup) */}
+        {status === "success" && (
+          <motion.div
+            className="w-full max-w-md"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="glass-card space-y-4 p-6 text-center">
+              <h2 className="text-xl font-semibold text-white">You're all set</h2>
+              {message && <p className="text-white/70 text-sm">{message}</p>}
+
+              {createdAccountCode && (
+                <div className="space-y-2">
+                  <div className="text-white/80 text-sm">Your Account Code</div>
+                  <div className="text-3xl tracking-widest font-mono text-white bg-white/10 border border-white/20 rounded-xl py-4">
+                    {createdAccountCode}
+                  </div>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(createdAccountCode);
+                          setMessage("Copied! Save this code for future sign-ins.");
+                        } catch {
+                          setMessage("Couldn't copy automatically—please copy the code manually.");
+                        }
+                      }}
+                      className="bg-white/10 hover:bg-white/15 border border-white/20 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = createdProfileUrl || "/profile";
+                        window.location.href = url;
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!createdAccountCode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = createdProfileUrl || "/profile";
+                    window.location.href = url;
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Continue
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* FAMILY PROFILE ACCESS */}
         {status === "register" && familyMembers.length > 1 && (
           <motion.div
@@ -503,156 +405,68 @@ function MemberCheckin() {
                 transition={{ duration: 0.3 }}
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  // Start OTP; create members after verify
+                  // Validate inputs
                   if (!formName.trim()) { setStatus('error'); setMessage('Please enter member full name.'); return; }
                   if (!/^\s*\S+\s+\S+/.test(formName.trim())) { setStatus('error'); setMessage('Please enter member full name (first and last).'); return; }
                   if (!/^\S+@\S+\.\S+$/.test(formEmail.trim())) { setStatus('error'); setMessage('Please enter a valid member email.'); return; }
+                  
+                  setStatus('loading');
+                  setMessage('');
+                  
                   try {
-                    // Save form state before starting OTP
-                    saveFormState();
+                    // Create account - backend creates first member immediately
+                    const res = await apiFetch('/v1/auth/start', {
+                      method: 'POST',
+                      body: JSON.stringify({ email: formEmail.trim(), name: formName.trim() })
+                    })
                     
-                    const res = await apiFetch('/v1/auth/start', { method: 'POST', body: JSON.stringify({ email: formEmail.trim() }) })
-                    if (!res.ok) throw new Error('start failed')
+                    if (!res.ok) {
+                      throw new Error('Failed to create account')
+                    }
+                    
                     const data = await res.json()
-                    setOtpPendingId(data.pendingId); setOtpEmailMasked(data.to); setOtpEmail(formEmail.trim())
-                    return; // Stop here; rest of legacy flow runs after OTP verification
-                  } catch { setStatus('error'); setMessage('Failed to start verification. Please try again.'); }
-                  
-                  // FALLBACK: Original complex logic for existing users
-                  const allNames = [formName, ...familyNames];
-                  console.log("🔍 Starting returning user flow with names:", allNames);
-                  
-                  for (const name of allNames) {
-                    if (!/^\s*\S+\s+\S+/.test(name.trim())) {
-                      setMessage("Please enter member full name (first and last) for each member.");
-                      return;
-                    }
-                  }
-                  setStatus("loading");
-                  setMessage("");
-                  const API_URL = getApiUrl();
-                  
-                  try {
-                    // STEP 1: Check which names exist and which don't
-                    const existingMembers = [];
-                    const newMembers = [];
-                    let familyEmail = null;
                     
-                    console.log("🔍 STEP 1: Checking each name...");
-                    for (const name of allNames) {
-                      console.log(`🔍 Checking name: "${name.trim()}"`);
-                      try {
-                    const lookupRes = await fetch(`${API_URL}/member/lookup-by-name`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name: name.trim() }),
-                        });
-                        if (lookupRes.ok) {
-                          const memberData = await lookupRes.json();
-                          console.log(`✅ Found existing member:`, memberData);
-                          existingMembers.push({
-                            name: name.trim(),
-                            email: memberData.email,
-                            id: memberData.id
-                          });
-                          // Use the first found member's email as the family email
-                          if (!familyEmail) {
-                            familyEmail = memberData.email;
-                            console.log(`📧 Set family email to: ${familyEmail}`);
-                          }
-                        } else {
-                          console.log(`❌ Name not found: "${name.trim()}" - adding to new members`);
-                          newMembers.push(name.trim());
+                    if (data && data.ok) {
+                      // Account created - backend already created first member
+                      const firstMemberId = Array.isArray(data.members) && data.members.length > 0 ? data.members[0]?.id : null
+                      
+                      // Create additional family members if any
+                      if (isFamily && familyNames.length > 0) {
+                        const additionalNames = familyNames
+                          .map(n => (n || '').trim())
+                          .filter(n => n.length > 0 && /^\s*\S+\s+\S+/.test(n))
+                        
+                        for (const name of additionalNames) {
+                          try {
+                            await apiFetch('/v1/households/members', {
+                              method: 'POST',
+                              body: JSON.stringify({ name })
+                            })
+                          } catch {}
                         }
-                      } catch (error) {
-                        console.log(`❌ Error looking up "${name.trim()}":`, error);
-                        newMembers.push(name.trim());
                       }
-                    }
-                    
-                    console.log("🔍 STEP 1 RESULTS:");
-                    console.log("- Existing members:", existingMembers);
-                    console.log("- New members:", newMembers);
-                    console.log("- Family email:", familyEmail);
-                    
-                    // If no existing members found, show error
-                    if (existingMembers.length === 0) {
-                      console.log("❌ No existing members found, redirecting to register");
-                      setStatus("register");
-                      setFormName("");
-                      setFamilyNames([]);
-                      setMessage("No existing members found with these names. Please register instead.");
+                      
+                      // Store context
+                      localStorage.setItem('member_email', formEmail.trim())
+                      if (data.householdCode) {
+                        localStorage.setItem('household_code', data.householdCode)
+                      }
+                      if (firstMemberId) {
+                        localStorage.setItem('member_id', firstMemberId)
+                      }
+                      // Show the account code so the user can save it.
+                      setCreatedAccountCode(data.householdCode || null)
+                      const profileUrl = firstMemberId ? `/profile?id=${firstMemberId}` : `/profile?email=${encodeURIComponent(formEmail.trim())}`
+                      setCreatedProfileUrl(profileUrl)
+                      setStatus('success')
+                      setMessage('Account created! Save your 5-character account code for future sign-ins.')
                       return;
                     }
                     
-                    // STEP 2: Add new members to the existing family (if any)
-                    if (newMembers.length > 0 && familyEmail) {
-                      console.log("🔍 STEP 2: Adding new members to family...");
-                      console.log(`📝 Adding ${newMembers.length} new members to email: ${familyEmail}`);
-                      try {
-                        const addRes = await fetch(`${API_URL}/family/add-members`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            email: familyEmail,
-                            new_members: newMembers,
-                          }),
-                        });
-                        if (addRes.ok) {
-                          const addResult = await addRes.json();
-                          console.log("✅ Successfully added new members:", addResult);
-                        } else {
-                          const err = await addRes.json();
-                          console.error("❌ Failed to add new members:", err.detail);
-                        }
-                      } catch (error) {
-                        console.error("❌ Error adding new members:", error);
-                      }
-                    } else {
-                      console.log("🔍 STEP 2: Skipped - no new members to add");
-                    }
-                    
-                    // STEP 3: Get updated family info and set up localStorage
-                    console.log("🔍 STEP 3: Getting updated family info...");
-                    try {
-                      const familyRes = await fetch(`${API_URL}/family/members/${encodeURIComponent(familyEmail)}`);
-                      if (familyRes.ok) {
-                        const familyData = await familyRes.json();
-                        const familyMemberNames = familyData.map((m: any) => m.name);
-                        console.log("✅ Updated family members:", familyMemberNames);
-                        
-                        // Set up localStorage
-                          localStorage.setItem("family_members", JSON.stringify(familyMemberNames));
-                        localStorage.setItem("member_email", familyEmail);
-                        localStorage.setItem("member_id", existingMembers[0].id);
-                        setMemberEmail(familyEmail);
-                          setFamilyMembers(familyMemberNames);
-                        console.log("✅ localStorage updated");
-                        
-                        // For registration flow, just redirect to profile (no check-in)
-                        if (familyMemberNames.length > 1) {
-                          // Family - redirect to family profile using email
-                          window.location.href = `/profile?email=${encodeURIComponent(familyEmail)}`;
-                          return;
-                        } else {
-                          // Single member - redirect to profile
-                          window.location.href = `/profile?id=${existingMembers[0].id}`;
-                          return;
-                        }
-                    } else {
-                        console.error("❌ Failed to load family information");
-                        setStatus("error");
-                        setMessage("Failed to load family information.");
-                      }
-                    } catch (error) {
-                      console.error("❌ Network error loading family information:", error);
-                      setStatus("error");
-                      setMessage("Network error loading family information.");
-                    }
-                  } catch (error) {
-                    console.error("❌ General network error:", error);
-                    setStatus("error");
-                    setMessage("Network error. Please try again.");
+                    throw new Error('Unexpected response format')
+                  } catch (error: any) {
+                    setStatus('error')
+                    setMessage(error.message || 'Failed to create account. Please try again.')
                   }
                 }}
               >

@@ -18,7 +18,7 @@ import models
 from models import generate_barcode
 from database import engine, SessionLocal
 from typing import List, Dict, Optional
-from auth.otp import is_valid_account_code
+from auth.account_code import is_valid_account_code
 
 from pydantic import BaseModel
 from starlette.middleware.gzip import GZipMiddleware
@@ -151,18 +151,8 @@ async def startup_event():
         # Create all tables
         models.Base.metadata.create_all(bind=engine)
         
-        # CLEAN UP DEAD DATA FIRST - Remove all unverified/expired households
+        # Startup cleanup (no email verification / OTP concepts)
         with engine.connect() as conn:
-            # Remove all unverified households (clean slate)
-            result1 = conn.execute(text("DELETE FROM households WHERE email_verified_at IS NULL"))
-            
-            # Remove expired verifications (older than 24 hours)
-            result2 = conn.execute(text("""
-                DELETE FROM households 
-                WHERE email_verification_expires_at < NOW() - INTERVAL '24 hours' 
-                AND email_verified_at IS NULL
-            """))
-            
             # Remove orphaned households (households with no members)
             result3 = conn.execute(text("""
                 DELETE FROM households 
@@ -174,7 +164,7 @@ async def startup_event():
             """))
             
             # Log cleanup results
-            logger.info(f"Startup cleanup: Removed {result1.rowcount} unverified households, {result2.rowcount} expired verifications, {result3.rowcount} orphaned households")
+            logger.info(f"Startup cleanup: Removed {result3.rowcount} orphaned households")
             
             conn.commit()
         
@@ -212,10 +202,6 @@ JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
 JWT_ALG = "HS256"
 SESSION_COOKIE = "mh_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
-
-
-def otp_enabled() -> bool:
-    return os.getenv("OTP_ENABLED", "true").lower() not in ("0", "false", "no", "off")
 
 
 def _create_session_cookie(response: Response, household_id: str):
@@ -297,34 +283,9 @@ async def debug_barcode_test(db: Session = Depends(get_db)):
             content={"error": str(e)}
         )
 
-# Debug endpoint to test email sending
-@app.post("/debug/email-test")
-async def debug_email_test(request: Request):
-    try:
-        body = await request.json()
-        test_email = body.get("email", "test@example.com")
-        
-        from emails.sender import send_email
-        
-        # Test email send
-        send_email(
-            to=test_email,
-            subject="Test Email from MAS Hub",
-            html="<p>This is a test email to verify Resend configuration.</p>"
-        )
-        
-        return {
-            "message": "Test email sent",
-            "to": test_email,
-            "from": os.getenv("EMAIL_FROM", "Not set"),
-            "resend_key_set": bool(os.getenv("RESEND_API_KEY"))
-        }
-    except Exception as e:
-        logger.error("Email test failed", error=str(e))
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+#
+# Email sending has been removed from this application.
+# (No email verification, no OTP, no welcome emails.)
 
 @app.get("/metrics")
 async def get_metrics():
@@ -419,223 +380,83 @@ class StartAuthAccountBody(BaseModel):
 
 @router.post("/auth/start")
 def start_auth(body: StartAuthBody, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Simple account creation - no OTP, just create and login immediately"""
     from sqlalchemy import select
     from models import Household
 
     email = str(body.email).strip().lower()
-    logger.info("Auth start request received", email=email, name_received=body.name, name_type=type(body.name).__name__)
-
-    # Look up existing household for this email
-    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-
-    # Simple immediate login: create/verify household and member
-    household = existing or Household(owner_email=email)
-    if not existing:
-        db.add(household)
-        db.flush()
+    member_name = (body.name or "").strip() if body.name else ""
     
-    # Always verify immediately (no OTP)
-    household.email_verified_at = datetime.now(pytz.UTC)
-    household.email_verification_token_hash = None
-    household.email_verification_expires_at = None
-    db.add(household)
+    if not member_name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    # Get or create household
+    household = db.execute(
+        select(Household).where(Household.owner_email == email).order_by(Household.created_at.desc())
+    ).scalars().first()
+    
+    if household:
+        # Account exists - reuse it
+        pass
+    else:
+        # Create new household
+        household = Household(owner_email=email)
+        db.add(household)
+        db.flush()  # Flush to get household_code
+        db.commit()
+    
+    # Check if member already exists for this household
+    existing_members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
+    
+    # Create member if none exists
+    if not existing_members:
+        # Generate barcode
+        barcode = None
+        for _ in range(10):
+            candidate = generate_barcode()
+            exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
+            if not exists:
+                barcode = candidate
+                break
+        
+        member = models.Member(
+            email=household.owner_email,
+            name=member_name,
+            barcode=barcode,
+            household_id=household.id,
+        )
+        db.add(member)
     db.commit()
 
-    # Create first member with provided name if none exists
-    existing_members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
-    if not existing_members:
-        member_name = (body.name or "").strip() if body.name else ""
-        logger.info("Attempting to create member", household_id=str(household.id), member_name=member_name, name_provided=bool(body.name))
-        if member_name:
-            try:
-                # Generate unique barcode (best-effort)
-                barcode = None
-                try:
-                    for _ in range(10):
-                        candidate = generate_barcode()
-                        exists = db.execute(select(models.Member).where(models.Member.barcode == candidate)).scalar_one_or_none()
-                        if not exists:
-                            barcode = candidate
-                            break
-                except Exception as e:
-                    logger.warning(f"Barcode generation failed, continuing without barcode: {e}")
-                    barcode = None
-                
-                m = models.Member(
-                    email=household.owner_email,
-                    name=member_name,
-                    barcode=barcode,
-                    household_id=household.id,
-                )
-                db.add(m)
-                db.flush()  # Flush first to get the ID
-                db.commit()
-                logger.info("Successfully created initial member", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
-            except Exception as e:
-                logger.error(f"CRITICAL: Failed to create initial member: {e}", exc_info=True)
-                db.rollback()  # Rollback the failed transaction
-                # Create member without barcode as fallback
-                try:
-                    m = models.Member(
-                        email=household.owner_email,
-                        name=member_name,
-                        barcode=None,  # No barcode
-                        household_id=household.id,
-                    )
-                    db.add(m)
-                    db.commit()
-                    logger.info("Created member without barcode as fallback", household_id=str(household.id), member_name=member_name, member_id=str(m.id))
-                except Exception as e2:
-                    logger.error(f"CRITICAL: Even fallback member creation failed: {e2}", exc_info=True)
-                    db.rollback()
-        else:
-            logger.warning("No member name provided, skipping member creation", household_id=str(household.id))
+    # Email sending is intentionally not supported.
 
-    # Best-effort welcome email
-    try:
-        from emails.sender import send_welcome_email
-        send_welcome_email(
-            to=household.owner_email,
-            account_number=household.household_code,
-            household_id=str(household.id)
-        )
-    except Exception as e:
-        logger.error(f"Failed to send welcome email: {e}")
-
-    # Return profile with session cookie - ALWAYS include all fields
-    # Refresh household to get latest state
-    db.refresh(household)
-    # Query members fresh after all commits
+    # Get all members
     members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
-    logger.info("Final member query", household_id=str(household.id), member_count=len(members), member_names=[m.name for m in members])
     
+    # Create session and return profile
     token = jwt.encode({"household_id": str(household.id), "iat": int(datetime.utcnow().timestamp())}, JWT_SECRET, algorithm=JWT_ALG)
     payload = {
         "ok": True,
         "session_token": token,
         "householdId": str(household.id),
         "ownerEmail": household.owner_email,
-        "members": [
-            {"id": str(m.id), "name": m.name}
-            for m in members
-        ],
+        "members": [{"id": str(m.id), "name": m.name} for m in members],
         "householdCode": household.household_code,
     }
-    logger.info("Immediate login response", email=email, household_id=str(household.id), member_count=len(members), has_members=len(members) > 0, payload_members=payload["members"])
+    
     resp = JSONResponse(payload)
     resp.headers["Cache-Control"] = "no-store"
     _create_session_cookie(resp, str(household.id))
-    logger.info("Session cookie set", household_id=str(household.id))
     return resp
 
 
 @router.post("/auth/signin")
 def signin_auth(body: StartAuthBody, request: Request, response: Response, db: Session = Depends(get_db)):
-    """Sign in with existing email - sends OTP for verification"""
-    from sqlalchemy import select
-    from models import Household
-    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
-    from emails.sender import send_email
-
-    email = str(body.email).strip().lower()
-
-    # Check if account exists - SIGN IN ONLY FOR EXISTING ACCOUNTS
-    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-    if not existing:
-        # Account doesn't exist - user must register first
-        raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
-    
-    # Check if this is a pending verification that was never completed
-    if existing.email_verification_token_hash and existing.email_verification_expires_at:
-        # If the pending verification has expired, clean it up and treat as new account
-        if datetime.now(pytz.UTC) > existing.email_verification_expires_at:
-            # Expired verification - clean it up and treat as new account
-            db.delete(existing)
-            db.commit()
-            logger.info("Cleaned up expired pending verification during signin attempt", email=email)
-            # Now treat as new account - user should register first
-            raise HTTPException(status_code=404, detail="No account found with this email. Please register first.")
-    
-    # Check if account is actually verified
-    if not existing.email_verified_at:
-        # Account exists but not verified - user should complete registration first
-        raise HTTPException(status_code=400, detail="Account not verified. Please complete registration first.")
-    
-    # If OTP is disabled, immediately set session and return full profile
-    if not otp_enabled():
-        from sqlalchemy import select
-        members = db.execute(select(models.Member).where(models.Member.household_id == existing.id)).scalars().all()
-        payload = {
-            "ok": True,
-            "householdId": str(existing.id),
-            "ownerEmail": existing.owner_email,
-            "members": [
-                {"id": str(m.id), "name": m.name}
-                for m in members
-            ],
-            "householdCode": existing.household_code,
-        }
-        resp = JSONResponse(payload)
-        resp.headers["Cache-Control"] = "no-store"
-        _create_session_cookie(resp, str(existing.id))
-        return resp
-
-    # Account exists and is verified - send OTP for sign in
-    rl_key = f"{request.client.host}:{email}"
-    if not rate_limit_ok(rl_key):
-        raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
-
-    code = generate_otp()
-    existing.email_verification_token_hash = hash_token(code)
-    existing.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
-    db.add(existing)
-    db.commit()
-
-    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
-    send_email(to=email, subject="Your MAS verification code", html=html)
-
-    return {"pendingId": str(existing.id), "to": mask_email(email)}
-
-
-@router.post("/auth/start-account")
-def start_auth_account(body: StartAuthAccountBody, request: Request, db: Session = Depends(get_db)):
-    from sqlalchemy import select, func
-    from models import Household
-    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
-    from emails.sender import send_email
-    
-    # Validate account number format
-    account_number = body.accountNumber.strip().upper()
-    if not is_valid_account_code(account_number):
-        raise HTTPException(status_code=422, detail="Account number must be exactly 5 characters from A-Z and 2-9")
-    
-    # Find household by account number (case-insensitive)
-    household = db.execute(
-        select(Household).where(func.upper(Household.household_code) == account_number)
-    ).scalar_one_or_none()
-    
-    # Always return 200 to avoid account enumeration
-    if not household:
-        return {"message": "If an account exists with this number, a verification code will be sent to the registered email."}
-    
-    email = household.owner_email
-    
-    # Rate limiting by IP + account
-    rl_key = f"{request.client.host}:{account_number}"
-    if not rate_limit_ok(rl_key):
-        raise HTTPException(status_code=429, detail="Too many requests. Please wait before retrying.")
-    
-    # Generate and send OTP
-    code = generate_otp()
-    household.email_verification_token_hash = hash_token(code)
-    household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
-    db.add(household)
-    db.commit()
-    
-    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
-    send_email(to=email, subject="Your MAS verification code", html=html)
-    
-    return {"pendingId": str(household.id), "to": mask_email(email)}
+    """Email-based sign-in removed. Use /v1/auth/login-account with account code."""
+    raise HTTPException(
+        status_code=410,
+        detail="Email sign-in has been removed. Please use your 5-character account code to sign in.",
+    )
 
 
 @router.post("/auth/login-account")
@@ -692,122 +513,9 @@ def logout_auth(response: Response):
     return {"message": "Logged out successfully"}
 
 
-class VerifyAuthBody(BaseModel):
-    pendingId: str
-    code: str
-
-class ResendAuthBody(BaseModel):
-    pendingId: str
-    email: EmailStr
-    isSignIn: bool = False
-
-@router.post("/auth/resend")
-def resend_auth(body: ResendAuthBody, request: Request, db: Session = Depends(get_db)):
-    """Resend OTP code for existing pending verification"""
-    from sqlalchemy import select
-    from models import Household
-    from auth.otp import generate_otp, hash_token, mask_email, rate_limit_ok
-    from emails.sender import send_email
-
-    if not is_valid_uuid(body.pendingId):
-        raise HTTPException(status_code=400, detail="Invalid pendingId")
-
-    email = str(body.email).strip().lower()
-    
-    # Find household by pendingId and email
-    household = db.execute(
-        select(Household).where(
-            and_(
-                Household.id == uuid.UUID(body.pendingId),
-                Household.owner_email == email
-            )
-        )
-    ).scalar_one_or_none()
-    
-    if not household:
-        raise HTTPException(status_code=404, detail="Pending verification not found")
-    
-    # Check if there's an existing pending verification
-    if not household.email_verification_token_hash or not household.email_verification_expires_at:
-        raise HTTPException(status_code=400, detail="No pending verification")
-    
-    # Check if code has expired
-    if datetime.now(pytz.UTC) > household.email_verification_expires_at:
-        raise HTTPException(status_code=410, detail="Code expired")
-    
-    # Rate limiting for resend requests
-    rl_key = f"{request.client.host}:resend:{email}"
-    if not rate_limit_ok(rl_key):
-        raise HTTPException(status_code=429, detail="Too many resend requests. Please wait before retrying.")
-    
-    # Generate new OTP and update household
-    code = generate_otp()
-    household.email_verification_token_hash = hash_token(code)
-    household.email_verification_expires_at = datetime.now(pytz.UTC) + timedelta(hours=24)
-    db.add(household)
-    db.commit()
-    
-    # Send new email
-    html = f"<p>Your MAS Hub verification code is <b>{code}</b>. It expires in 24 hours.</p>"
-    send_email(to=email, subject="Your MAS verification code", html=html)
-    
-    return {"message": "Verification code resent successfully", "to": mask_email(email)}
-
-@router.post("/auth/verify")
-def verify_auth(body: VerifyAuthBody, response: Response, db: Session = Depends(get_db)):
-    from sqlalchemy import select
-    from models import Household, Member
-    if not is_valid_uuid(body.pendingId):
-        raise HTTPException(status_code=400, detail="Invalid pendingId")
-
-    household = db.execute(select(Household).where(Household.id == uuid.UUID(body.pendingId))).scalar_one_or_none()
-    if not household:
-        raise HTTPException(status_code=404, detail="Not found")
-    if not household.email_verification_token_hash or not household.email_verification_expires_at:
-        raise HTTPException(status_code=400, detail="No pending verification")
-    if datetime.now(pytz.UTC) > household.email_verification_expires_at:
-        raise HTTPException(status_code=410, detail="Code expired")
-
-    from auth.otp import hash_token
-    if hash_token(body.code.strip()) != household.email_verification_token_hash:
-        raise HTTPException(status_code=400, detail="Invalid code")
-
-    household.email_verified_at = datetime.now(pytz.UTC)
-    household.email_verification_token_hash = None
-    household.email_verification_expires_at = None
-    db.add(household)
-    db.commit()
-
-    # Send welcome email with account number and QR code
-    try:
-        from emails.sender import send_welcome_email
-        send_welcome_email(
-            to=household.owner_email,
-            account_number=household.household_code,
-            household_id=str(household.id)
-        )
-    except Exception as e:
-        # Log error but don't fail the verification
-        logger.error(f"Failed to send welcome email: {e}")
-
-    token = _create_session_cookie(response, str(household.id))
-    # prevent caching; include a short-lived session_token echo for immediate use
-    response.headers["Cache-Control"] = "no-store"
-    members = db.execute(select(models.Member).where(models.Member.household_id == household.id)).scalars().all()
-    return JSONResponse(
-        {
-            "ok": True,
-            "session_token": token,
-            "householdId": str(household.id),
-            "ownerEmail": household.owner_email,
-                    "members": [
-            {"id": str(m.id), "name": m.name}
-            for m in members
-        ],
-            "householdCode": household.household_code,
-        },
-        headers={"Cache-Control": "no-store"},
-    )
+#
+# OTP endpoints removed (no resend/verify flows)
+#
 
 @router.get("/households/me")
 def households_me(request: Request, db: Session = Depends(get_db)):
@@ -2008,62 +1716,6 @@ async def cleanup_orphaned_households(request: Request, db: Session = Depends(ge
         logger.error("Failed to cleanup orphaned households", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to cleanup orphaned households")
 
-@app.post("/admin/cleanup-expired-verifications")
-@limiter.limit("5/minute")
-async def cleanup_expired_verifications(request: Request, db: Session = Depends(get_db)):
-    """Clean up expired verification attempts and unverified households"""
-    
-    # Delete households that are older than 24 hours and unverified
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
-    
-    expired_households = db.query(models.Household).filter(
-        models.Household.created_at < cutoff_time,
-        models.Household.verified == False
-    ).all()
-    
-    if not expired_households:
-        return {"message": "No expired verifications found", "deleted_count": 0}
-    
-    deleted_count = 0
-    deleted_households = []
-    
-    for household in expired_households:
-        try:
-            logger.info("Deleting expired verification household", 
-                       household_id=str(household.id),
-                       household_code=household.household_code,
-                       email=household.owner_email,
-                       created_at=str(household.created_at))
-            
-            db.delete(household)
-            deleted_count += 1
-            deleted_households.append({
-                "id": str(household.id),
-                "code": household.household_code,
-                "email": household.owner_email,
-                "created_at": str(household.created_at)
-            })
-            
-        except Exception as e:
-            logger.error("Failed to delete expired household", 
-                        error=str(e),
-                        household_id=str(household.id))
-    
-    try:
-        db.commit()
-        logger.info("Expired verification cleanup completed", deleted_count=deleted_count)
-        
-        return {
-            "message": f"Successfully deleted {deleted_count} expired verification households",
-            "deleted_count": deleted_count,
-            "deleted_households": deleted_households
-        }
-        
-    except Exception as e:
-        db.rollback()
-        logger.error("Failed to commit expired verification cleanup", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to cleanup expired verifications")
-
 @app.get("/admin/status")
 @limiter.limit("10/minute")
 async def get_admin_status(request: Request, db: Session = Depends(get_db)):
@@ -2072,16 +1724,6 @@ async def get_admin_status(request: Request, db: Session = Depends(get_db)):
     try:
         # Count total households
         total_households = db.query(models.Household).count()
-        
-        # Count verified households
-        verified_households = db.query(models.Household).filter(
-            models.Household.verified == True
-        ).count()
-        
-        # Count unverified households
-        unverified_households = db.query(models.Household).filter(
-            models.Household.verified == False
-        ).count()
         
         # Count orphaned households (households with no members)
         orphaned_households = db.query(models.Household).outerjoin(
@@ -2099,8 +1741,6 @@ async def get_admin_status(request: Request, db: Session = Depends(get_db)):
             "timestamp": datetime.utcnow().isoformat(),
             "households": {
                 "total": total_households,
-                "verified": verified_households,
-                "unverified": unverified_households,
                 "orphaned": orphaned_households
             },
             "members": {
@@ -2598,48 +2238,6 @@ def auth_session(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     return {"ok": True, "householdId": str(household.id), "email": household.owner_email} 
 
-@router.post("/auth/cleanup-expired")
-def cleanup_expired_verifications(request: Request, db: Session = Depends(get_db)):
-    """Clean up expired email verifications to allow users to retry registration"""
-    from sqlalchemy import select, delete
-    from models import Household
-    
-    # Find all expired verifications
-    expired_households = db.execute(
-        select(Household).where(
-            Household.email_verification_expires_at < datetime.now(pytz.UTC),
-            Household.email_verification_token_hash.is_not(None)
-        )
-    ).scalars().all()
-    
-    cleaned_count = 0
-    for household in expired_households:
-        if not household.email_verified_at:
-            # Only delete unverified accounts with expired OTPs
-            db.delete(household)
-            cleaned_count += 1
-    
-    db.commit()
-    
-    logger.info(f"Cleaned up {cleaned_count} expired verifications")
-    return {"message": f"Cleaned up {cleaned_count} expired verifications", "cleaned_count": cleaned_count}
-
-
-@router.post("/auth/reset-email")
-def reset_email_registration(request: Request, body: StartAuthBody, db: Session = Depends(get_db)):
-    """Reset email registration - allows users to start fresh with the same email"""
-    from sqlalchemy import select
-    from models import Household
-    
-    email = str(body.email).strip().lower()
-    
-    # Find any existing household with this email
-    existing = db.execute(select(Household).where(Household.owner_email == email)).scalar_one_or_none()
-    
-    if existing:
-        # Delete the existing household to allow fresh registration
-        db.delete(existing)
-        db.commit()
-        logger.info(f"Reset email registration for {email}")
-    
-    return {"message": "Email reset successfully. You can now register again."}
+#
+# Email verification / reset flows removed.
+#

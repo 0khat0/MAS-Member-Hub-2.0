@@ -76,15 +76,15 @@ class MemberHubBackup:
         
         with engine.connect() as connection:
             # Get all households
-            result = connection.execute(text("SELECT * FROM households"))
+            # Explicit column list to remain stable across schema changes
+            result = connection.execute(text("SELECT id, owner_email, household_code, created_at FROM households"))
             households = []
             for row in result:
                 households.append({
                     'id': str(row[0]),
                     'owner_email': row[1],
-                    'email_verified_at': str(row[2]) if row[2] else None,
-                    'household_code': row[4],
-                    'created_at': str(row[5])
+                    'household_code': row[2],
+                    'created_at': str(row[3])
                 })
             backup_data['households'] = households
             
@@ -184,8 +184,8 @@ class MemberHubBackup:
             # Restore households
             for household in backup_data['households']:
                 connection.execute(text("""
-                    INSERT INTO households (id, owner_email, email_verified_at, household_code, created_at)
-                    VALUES (:id, :owner_email, :email_verified_at, :household_code, :created_at)
+                    INSERT INTO households (id, owner_email, household_code, created_at)
+                    VALUES (:id, :owner_email, :household_code, :created_at)
                 """), household)
             
             # Restore members
